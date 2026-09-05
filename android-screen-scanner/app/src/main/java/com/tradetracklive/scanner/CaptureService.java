@@ -25,6 +25,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -135,7 +137,7 @@ public class CaptureService extends Service {
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
         bubbleParams = new WindowManager.LayoutParams(
-                dp(68), dp(68), type,
+                dp(108), dp(88), type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
@@ -185,72 +187,106 @@ public class CaptureService extends Service {
         if (analyzing || imageReader == null || bubble == null) return;
 
         analyzing = true;
-        bubble.setText("…\nSCAN");
+        bubble.setText("…\nTRACKING");
         bubble.setVisibility(View.INVISIBLE);
 
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            Image image = imageReader.acquireLatestImage();
-            if (image == null) {
-                bubble.setVisibility(View.VISIBLE);
-                bubble.setText("TT\nSCAN");
-                analyzing = false;
-                return;
-            }
+        io.submit(() -> {
+            try {
+                final int frameIntervalMs = 700;
+                List<byte[]> frames = new ArrayList<>();
+                int outWidth = 0;
+                int outHeight = 0;
 
-            Bitmap bitmap = imageToBitmap(image);
-            image.close();
+                // Three short-spaced frames let the backend compare live candle movement,
+                // wick growth, rejection and breakout acceptance instead of judging one still image.
+                for (int i = 0; i < 3; i++) {
+                    if (i == 0) Thread.sleep(220);
+                    else Thread.sleep(frameIntervalMs);
 
-            if (bitmap == null) {
-                bubble.setVisibility(View.VISIBLE);
-                bubble.setText("TT\nSCAN");
-                analyzing = false;
-                return;
-            }
+                    Bitmap raw = acquireLatestBitmap();
+                    if (raw == null) continue;
 
-            io.submit(() -> {
-                try {
-                    Bitmap scaled = scaleForUpload(bitmap, 1080);
+                    Bitmap cropped = cropForAnalysis(raw);
+                    Bitmap scaled = scaleForUpload(cropped, 1080);
+                    outWidth = scaled.getWidth();
+                    outHeight = scaled.getHeight();
+
                     ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                    scaled.compress(Bitmap.CompressFormat.JPEG, 82, bos);
-                    byte[] jpeg = bos.toByteArray();
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 84, bos);
+                    frames.add(bos.toByteArray());
 
-                    JSONObject result = postFrame(jpeg, scaled.getWidth(), scaled.getHeight());
-                    JSONObject scan = result.optJSONObject("scan");
-
-                    if (scan == null) throw new IOException(result.optString("error", "No scan result"));
-
-                    String decision = scan.optString("decision", "SKIP").toUpperCase();
-                    int score = (int) Math.round(scan.optDouble("setupScore", 0));
-                    String asset = scan.optString("asset", "—");
-                    int payout = (int) Math.round(scan.optDouble("payout", 0));
-                    String rationale = scan.optString("rationale", "");
-
-                    new Handler(Looper.getMainLooper()).post(() -> {
-                        bubble.setVisibility(View.VISIBLE);
-                        if ("UP".equals(decision)) bubble.setText("↑\nUP\n" + score);
-                        else if ("DOWN".equals(decision)) bubble.setText("↓\nDOWN\n" + score);
-                        else bubble.setText("—\nSKIP\n" + score);
-
-                        bubble.setContentDescription(asset + " " + payout + "% " + decision + ". " + rationale);
-                        analyzing = false;
-
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            if (bubble != null && !analyzing) bubble.setText("TT\nSCAN");
-                        }, 12000);
-                    });
-                } catch (Exception e) {
-                    new Handler(Looper.getMainLooper()).post(() -> {
-                        bubble.setVisibility(View.VISIBLE);
-                        bubble.setText("!\nERROR");
-                        bubble.setContentDescription(e.getMessage());
-                        analyzing = false;
-                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            if (bubble != null && !analyzing) bubble.setText("TT\nSCAN");
-                        }, 5000);
-                    });
+                    if (scaled != cropped) scaled.recycle();
+                    if (cropped != raw) cropped.recycle();
+                    raw.recycle();
                 }
-            });
-        }, 180);
+
+                if (frames.isEmpty()) throw new IOException("Unable to capture Quotex screen");
+
+                JSONObject result = postFrames(frames, outWidth, outHeight, frameIntervalMs);
+                JSONObject scan = result.optJSONObject("scan");
+                if (scan == null) throw new IOException(result.optString("error", "No scan result"));
+
+                String decision = scan.optString("decision", "SKIP").toUpperCase();
+                int up = (int) Math.round(scan.optDouble("upConfirmation", 50));
+                int down = (int) Math.round(scan.optDouble("downConfirmation", 50));
+                String biasState = scan.optString("biasState", "WATCH").toUpperCase();
+                String asset = scan.optString("asset", "—");
+                int payout = (int) Math.round(scan.optDouble("payout", 0));
+                String rationale = scan.optString("rationale", "");
+
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (bubble == null) return;
+                    bubble.setVisibility(View.VISIBLE);
+
+                    String status;
+                    if ("UP".equals(decision)) status = "UP";
+                    else if ("DOWN".equals(decision)) status = "DOWN";
+                    else status = biasState.length() > 8 ? "WATCH" : biasState;
+
+                    bubble.setText("↑ " + up + "%   ↓ " + down + "%\n" + status);
+                    bubble.setContentDescription(
+                            asset + " " + payout + "%, UP confirmation " + up +
+                                    "%, DOWN confirmation " + down + "%, " + status + ". " + rationale
+                    );
+                    analyzing = false;
+
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        if (bubble != null && !analyzing) bubble.setText("TT\nSCAN");
+                    }, 14000);
+                });
+            } catch (Exception e) {
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    if (bubble == null) return;
+                    bubble.setVisibility(View.VISIBLE);
+                    bubble.setText("!\nERROR");
+                    bubble.setContentDescription(e.getMessage());
+                    analyzing = false;
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        if (bubble != null && !analyzing) bubble.setText("TT\nSCAN");
+                    }, 5000);
+                });
+            }
+        });
+    }
+
+    private Bitmap acquireLatestBitmap() {
+        if (imageReader == null) return null;
+        Image image = imageReader.acquireLatestImage();
+        if (image == null) return null;
+        try {
+            return imageToBitmap(image);
+        } finally {
+            image.close();
+        }
+    }
+
+    private Bitmap cropForAnalysis(Bitmap input) {
+        // Remove most of the top account/balance strip while keeping the chart and pair/payout UI.
+        int top = Math.max(0, Math.round(input.getHeight() * 0.065f));
+        int bottomTrim = Math.max(0, Math.round(input.getHeight() * 0.015f));
+        int height = input.getHeight() - top - bottomTrim;
+        if (height <= 0) return input;
+        return Bitmap.createBitmap(input, 0, top, input.getWidth(), height);
     }
 
     private Bitmap imageToBitmap(Image image) {
@@ -283,7 +319,7 @@ public class CaptureService extends Service {
         return Bitmap.createScaledBitmap(input, maxWidth, h, true);
     }
 
-    private JSONObject postFrame(byte[] jpeg, int width, int height) throws Exception {
+    private JSONObject postFrames(List<byte[]> frames, int width, int height, int frameIntervalMs) throws Exception {
         SharedPreferences prefs = getSharedPreferences("ttl_scanner", MODE_PRIVATE);
         String token = prefs.getString("bridgeToken", "");
         if (token == null || token.trim().isEmpty()) throw new IOException("Scanner Token missing");
@@ -291,7 +327,7 @@ public class CaptureService extends Service {
         String boundary = "----TTL" + System.currentTimeMillis();
         HttpURLConnection conn = (HttpURLConnection) new URL(ENDPOINT).openConnection();
         conn.setConnectTimeout(10000);
-        conn.setReadTimeout(20000);
+        conn.setReadTimeout(30000);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
         conn.setRequestProperty("X-App-Id", APP_ID);
@@ -303,12 +339,21 @@ public class CaptureService extends Service {
             writeField(out, boundary, "capturedAt", Instant.now().toString());
             writeField(out, boundary, "imageWidth", String.valueOf(width));
             writeField(out, boundary, "imageHeight", String.valueOf(height));
+            writeField(out, boundary, "frameIntervalMs", String.valueOf(frameIntervalMs));
 
-            out.writeBytes("--" + boundary + "\r\n");
-            out.writeBytes("Content-Disposition: form-data; name=\"frame\"; filename=\"screen.jpg\"\r\n");
-            out.writeBytes("Content-Type: image/jpeg\r\n\r\n");
-            out.write(jpeg);
-            out.writeBytes("\r\n--" + boundary + "--\r\n");
+            String[] names = {"frame", "frame2", "frame3"};
+            for (int i = 0; i < frames.size() && i < names.length; i++) {
+                out.writeBytes("--" + boundary + "\r\n");
+                out.writeBytes(
+                        "Content-Disposition: form-data; name=\"" + names[i] +
+                                "\"; filename=\"screen-" + (i + 1) + ".jpg\"\r\n"
+                );
+                out.writeBytes("Content-Type: image/jpeg\r\n\r\n");
+                out.write(frames.get(i));
+                out.writeBytes("\r\n");
+            }
+
+            out.writeBytes("--" + boundary + "--\r\n");
             out.flush();
         }
 

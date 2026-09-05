@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
         root.setGravity(Gravity.TOP);
 
         TextView title = text("TradeTrack Live Scanner", 24, Color.WHITE, true);
-        TextView subtitle = text("Quotex app screen → TT Scan → UP / DOWN / SKIP", 13, Color.rgb(148,163,184), false);
+        TextView subtitle = text("3-frame chart scan → UP% / DOWN% + signal", 13, Color.rgb(148,163,184), false);
 
         tokenInput = new EditText(this);
         tokenInput.setHint("Paste 8-hour Scanner Token");
@@ -72,7 +72,7 @@ public class MainActivity extends Activity {
                 "How it works:\n1. Create a Scanner Token in TradeTrack Live → Phone Screen Scan.\n" +
                 "2. Paste it here.\n3. Enable screen capture and overlay permission.\n" +
                 "4. Open Quotex Broker App.\n5. Tap the floating TT Scan button whenever you want a scan.\n\n" +
-                "Only one frame is uploaded when you tap Scan. The scanner does not tap Quotex buttons or place trades.",
+                "Each scan captures 3 short-spaced chart frames to track live candle movement. The scanner does not tap Quotex buttons or place trades.",
                 12, Color.rgb(148,163,184), false
         );
 
