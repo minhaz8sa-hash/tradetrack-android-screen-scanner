@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "TradeTrack Live PC Scanner",
+  "version": "1.0.0",
+  "description": "Continuous Quotex screen scanner that analyzes the running candle and reveals a NEXT-candle signal near T-5 to T-2.",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://base44.app/*",
+    "https://qxbroker.com/*",
+    "https://*.qxbroker.com/*",
+    "https://quotex.com/*",
+    "https://*.quotex.com/*",
+    "https://quotex.io/*",
+    "https://*.quotex.io/*",
+    "https://market-qx.trade/*",
+    "https://*.market-qx.trade/*",
+    "https://market-qx.pro/*",
+    "https://*.market-qx.pro/*",
+    "https://qxbroker.dev/*",
+    "https://*.qxbroker.dev/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "TradeTrack PC Scanner",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://qxbroker.com/*",
+        "https://*.qxbroker.com/*",
+        "https://quotex.com/*",
+        "https://*.quotex.com/*",
+        "https://quotex.io/*",
+        "https://*.quotex.io/*",
+        "https://market-qx.trade/*",
+        "https://*.market-qx.trade/*",
+        "https://market-qx.pro/*",
+        "https://*.market-qx.pro/*",
+        "https://qxbroker.dev/*",
+        "https://*.qxbroker.dev/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

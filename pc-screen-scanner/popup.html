@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TradeTrack PC Scanner</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">TradeTrack Live PC Scanner</div>
+    <div class="sub">Running candle → continuous verification → NEXT candle</div>
+
+    <div class="card">
+      <label>8-hour Scanner Token</label>
+      <input id="token" type="password" placeholder="Paste Scanner Token">
+      <div class="grid">
+        <div>
+          <label>Asset override <span>optional</span></label>
+          <input id="asset" placeholder="NZDCHF_otc">
+        </div>
+        <div>
+          <label>Payout <span>optional</span></label>
+          <input id="payout" type="number" min="1" max="100" placeholder="92">
+        </div>
+      </div>
+      <button id="save">Save token for this Chrome session</button>
+    </div>
+
+    <div class="card">
+      <div class="row"><b>Status</b><span id="state">READY</span></div>
+      <div id="meta" class="meta">Open a Quotex trading tab.</div>
+      <div id="signal" class="signal">No scan running.</div>
+    </div>
+
+    <button id="arm" class="secondary">ARM scanner on current Quotex tab</button>
+    <div class="foot">
+      Best use: arm around T-50…T-30. The extension keeps scanning, verifies around T-20…T-10, and reveals only a NEXT-candle signal around T-5…T-2. It never clicks Up/Down or places a trade.
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
