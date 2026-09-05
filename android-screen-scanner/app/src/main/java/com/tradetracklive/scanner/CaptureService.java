@@ -187,12 +187,12 @@ public class CaptureService extends Service {
         if (analyzing || imageReader == null || bubble == null) return;
 
         analyzing = true;
-        bubble.setText("…\nTRACKING");
+        bubble.setText("NEXT\nSCANNING");
         bubble.setVisibility(View.INVISIBLE);
 
         io.submit(() -> {
             try {
-                final int frameIntervalMs = 700;
+                final int frameIntervalMs = 1800;
                 List<byte[]> frames = new ArrayList<>();
                 int outWidth = 0;
                 int outHeight = 0;
@@ -230,6 +230,7 @@ public class CaptureService extends Service {
                 int up = (int) Math.round(scan.optDouble("upConfirmation", 50));
                 int down = (int) Math.round(scan.optDouble("downConfirmation", 50));
                 String biasState = scan.optString("biasState", "WATCH").toUpperCase();
+                int secondsLeft = (int) Math.round(scan.optDouble("secondsToCandleClose", -1));
                 String asset = scan.optString("asset", "—");
                 int payout = (int) Math.round(scan.optDouble("payout", 0));
                 String rationale = scan.optString("rationale", "");
@@ -239,13 +240,21 @@ public class CaptureService extends Service {
                     bubble.setVisibility(View.VISIBLE);
 
                     String status;
-                    if ("UP".equals(decision)) status = "UP";
-                    else if ("DOWN".equals(decision)) status = "DOWN";
-                    else status = biasState.length() > 8 ? "WATCH" : biasState;
+                    if ("WAIT_T10".equals(biasState)) {
+                        status = "WAIT T-10";
+                        bubble.setText(secondsLeft > 12 ? "WAIT\nT-10s" : "WAIT\nT-10");
+                    } else if ("TOO_LATE".equals(biasState)) {
+                        status = "TOO LATE";
+                        bubble.setText("TOO\nLATE");
+                    } else {
+                        if ("UP".equals(decision)) status = "UP";
+                        else if ("DOWN".equals(decision)) status = "DOWN";
+                        else status = "WATCH";
+                        bubble.setText("NEXT  ↑" + up + "%  ↓" + down + "%\n" + status);
+                    }
 
-                    bubble.setText("↑ " + up + "%   ↓ " + down + "%\n" + status);
                     bubble.setContentDescription(
-                            asset + " " + payout + "%, UP confirmation " + up +
+                            asset + " " + payout + "%. Target NEXT candle. UP confirmation " + up +
                                     "%, DOWN confirmation " + down + "%, " + status + ". " + rationale
                     );
                     analyzing = false;
