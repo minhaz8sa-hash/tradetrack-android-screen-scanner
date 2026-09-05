@@ -53,8 +53,37 @@ public class CaptureService extends Service {
     private boolean armed = false;
     private String scanSessionId = null;
     private int scanAttempt = 0;
+    private long estimatedCloseEpochMs = 0L;
+    private boolean heldCandidateReady = false;
+    private String heldDirection = "";
+    private int heldUp = 50;
+    private int heldDown = 50;
+    private int heldInstability = 100;
+    private double heldSourceSeconds = -1;
+    private String heldAsset = "—";
+    private int heldPayout = 0;
     private boolean stopping = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private final Runnable finalWindowWatcher = new Runnable() {
+        @Override public void run() {
+            if (!armed || bubble == null || estimatedCloseEpochMs <= 0L) return;
+
+            long remainingMs = estimatedCloseEpochMs - System.currentTimeMillis();
+
+            if (remainingMs <= 5000 && remainingMs >= 2000 && heldCandidateReady && heldSourceSeconds >= 0 && heldSourceSeconds <= 15) {
+                releaseHeldSignal();
+                return;
+            }
+
+            if (remainingMs < 2000) {
+                finishNoTrade("No stable next-candle confirmation before close");
+                return;
+            }
+
+            mainHandler.postDelayed(this, 250);
+        }
+    };
 
     @Override
     public void onCreate() {
@@ -196,8 +225,19 @@ public class CaptureService extends Service {
         armed = true;
         scanAttempt = 0;
         scanSessionId = UUID.randomUUID().toString();
+        estimatedCloseEpochMs = 0L;
+        heldCandidateReady = false;
+        heldDirection = "";
+        heldUp = 50;
+        heldDown = 50;
+        heldInstability = 100;
+        heldSourceSeconds = -1;
+        heldAsset = "—";
+        heldPayout = 0;
+        mainHandler.removeCallbacks(finalWindowWatcher);
+        mainHandler.post(finalWindowWatcher);
         bubble.setText("ARMED\nSCANNING");
-        bubble.setContentDescription("Scanner armed. It will keep analyzing until the final signal window.");
+        bubble.setContentDescription("Scanner armed. Current candle is evidence only. Signal target is NEXT candle.");
         captureAndAnalyze();
     }
 
@@ -205,11 +245,55 @@ public class CaptureService extends Service {
         armed = false;
         scanSessionId = null;
         scanAttempt = 0;
+        estimatedCloseEpochMs = 0L;
+        heldCandidateReady = false;
+        mainHandler.removeCallbacks(finalWindowWatcher);
         if (bubble != null) {
             bubble.setVisibility(View.VISIBLE);
             bubble.setText("TT\nSCAN");
             bubble.setContentDescription("Scanner cancelled");
         }
+    }
+
+    private void releaseHeldSignal() {
+        if (!armed || bubble == null || !heldCandidateReady) return;
+
+        String arrow = "UP".equals(heldDirection) ? "↑" : "↓";
+        bubble.setVisibility(View.VISIBLE);
+        bubble.setText("NEXT " + arrow + " " + heldDirection + "\n↑" + heldUp + "%  ↓" + heldDown + "%");
+        bubble.setContentDescription(
+                heldAsset + " " + heldPayout + "%. Signal target NEXT candle. " +
+                        heldDirection + ". UP " + heldUp + "%, DOWN " + heldDown +
+                        "%. Final instability " + heldInstability + "."
+        );
+
+        armed = false;
+        analyzing = false;
+        scanSessionId = null;
+        estimatedCloseEpochMs = 0L;
+        mainHandler.removeCallbacks(finalWindowWatcher);
+
+        mainHandler.postDelayed(() -> {
+            if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
+        }, 12000);
+    }
+
+    private void finishNoTrade(String reason) {
+        if (bubble != null) {
+            bubble.setVisibility(View.VISIBLE);
+            bubble.setText("NO TRADE\nNEXT");
+            bubble.setContentDescription(reason);
+        }
+        armed = false;
+        analyzing = false;
+        scanSessionId = null;
+        estimatedCloseEpochMs = 0L;
+        heldCandidateReady = false;
+        mainHandler.removeCallbacks(finalWindowWatcher);
+
+        mainHandler.postDelayed(() -> {
+            if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
+        }, 7000);
     }
 
     private void captureAndAnalyze() {
@@ -219,31 +303,34 @@ public class CaptureService extends Service {
         scanAttempt++;
         final String thisSessionId = scanSessionId;
         final String analysisMode = scanAttempt == 1 ? "full" : "verify";
-        bubble.setText("SCANNING\n" + scanAttempt);
+        bubble.setText("CAPTURING\n" + scanAttempt);
         bubble.setVisibility(View.INVISIBLE);
 
         io.submit(() -> {
             try {
-                final int frameIntervalMs = analysisMode.equals("full") ? 900 : 650;
-                final int targetFrames = analysisMode.equals("full") ? 3 : 2;
+                final int frameIntervalMs = analysisMode.equals("full") ? 750 : 0;
+                final int targetFrames = analysisMode.equals("full") ? 3 : 1;
+                final int maxWidth = analysisMode.equals("full") ? 900 : 720;
+                final int jpegQuality = analysisMode.equals("full") ? 78 : 70;
+
                 List<byte[]> frames = new ArrayList<>();
                 int outWidth = 0;
                 int outHeight = 0;
 
                 for (int i = 0; i < targetFrames; i++) {
-                    if (i == 0) Thread.sleep(180);
+                    if (i == 0) Thread.sleep(160);
                     else Thread.sleep(frameIntervalMs);
 
                     Bitmap raw = acquireLatestBitmap();
                     if (raw == null) continue;
 
                     Bitmap cropped = cropForAnalysis(raw);
-                    Bitmap scaled = scaleForUpload(cropped, 900);
+                    Bitmap scaled = scaleForUpload(cropped, maxWidth);
                     outWidth = scaled.getWidth();
                     outHeight = scaled.getHeight();
 
                     ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                    scaled.compress(Bitmap.CompressFormat.JPEG, 78, bos);
+                    scaled.compress(Bitmap.CompressFormat.JPEG, jpegQuality, bos);
                     frames.add(bos.toByteArray());
 
                     if (scaled != cropped) scaled.recycle();
@@ -253,19 +340,27 @@ public class CaptureService extends Service {
 
                 if (frames.isEmpty()) throw new IOException("Unable to capture Quotex screen");
 
+                mainHandler.post(() -> {
+                    if (bubble != null && armed && thisSessionId != null && thisSessionId.equals(scanSessionId)) {
+                        bubble.setVisibility(View.VISIBLE);
+                        bubble.setText("ANALYZING\nNEXT");
+                    }
+                });
+
                 JSONObject result = postFrames(
                         frames, outWidth, outHeight, frameIntervalMs, thisSessionId, analysisMode
                 );
                 JSONObject scan = result.optJSONObject("scan");
                 if (scan == null) throw new IOException(result.optString("error", "No scan result"));
 
-                String decision = scan.optString("decision", "SKIP").toUpperCase();
                 int up = (int) Math.round(scan.optDouble("upConfirmation", 50));
                 int down = (int) Math.round(scan.optDouble("downConfirmation", 50));
                 String biasState = scan.optString("biasState", "SCANNING").toUpperCase();
-                double effectiveSeconds = scan.optDouble("effectiveSecondsToCandleClose", -1);
-                boolean shouldSignalNow = scan.optBoolean("shouldSignalNow", false);
-                int instability = (int) Math.round(scan.optDouble("endInstabilityScore", 0));
+                double sourceSeconds = scan.optDouble("secondsToCandleClose", -1);
+                boolean candidateReady = scan.optBoolean("candidateReady", false);
+                String candidateDirection = scan.optString("candidateDirection", "SKIP").toUpperCase();
+                int instability = (int) Math.round(scan.optDouble("endInstabilityScore", 100));
+                String estimatedCloseAt = scan.optString("estimatedCandleCloseAt", "");
                 String asset = scan.optString("asset", "—");
                 int payout = (int) Math.round(scan.optDouble("payout", 0));
                 String rationale = scan.optString("rationale", "");
@@ -277,67 +372,85 @@ public class CaptureService extends Service {
                         return;
                     }
 
+                    if (!estimatedCloseAt.isEmpty()) {
+                        try {
+                            long parsed = Instant.parse(estimatedCloseAt).toEpochMilli();
+                            if (parsed > System.currentTimeMillis()) {
+                                estimatedCloseEpochMs = parsed;
+                                mainHandler.removeCallbacks(finalWindowWatcher);
+                                mainHandler.post(finalWindowWatcher);
+                            }
+                        } catch (Exception ignored) {}
+                    }
+
+                    if (candidateReady && ("UP".equals(candidateDirection) || "DOWN".equals(candidateDirection)) && instability <= 45) {
+                        heldCandidateReady = true;
+                        heldDirection = candidateDirection;
+                        heldUp = up;
+                        heldDown = down;
+                        heldInstability = instability;
+                        heldSourceSeconds = sourceSeconds;
+                        heldAsset = asset;
+                        heldPayout = payout;
+                    } else if (sourceSeconds >= 0 && sourceSeconds <= 15) {
+                        // A later verification has priority. If it becomes unstable or loses confirmation,
+                        // discard the older candidate rather than showing stale confidence at T-5.
+                        heldCandidateReady = false;
+                    }
+
                     bubble.setVisibility(View.VISIBLE);
                     bubble.setContentDescription(
-                            asset + " " + payout + "%. NEXT candle. UP " + up + "%, DOWN " + down +
-                                    "%. Instability " + instability + ". " + rationale
+                            asset + " " + payout + "%. Current candle is evidence only. NEXT candle UP " +
+                                    up + "%, DOWN " + down + "%. " + rationale
                     );
 
-                    if (shouldSignalNow && ("UP".equals(decision) || "DOWN".equals(decision))) {
-                        String arrow = "UP".equals(decision) ? "↑" : "↓";
-                        bubble.setText("NEXT " + arrow + " " + decision + "\n↑" + up + "%  ↓" + down + "%");
-                        armed = false;
-                        analyzing = false;
-                        scanSessionId = null;
+                    long remainingMs = estimatedCloseEpochMs > 0L
+                            ? estimatedCloseEpochMs - System.currentTimeMillis()
+                            : -1L;
 
-                        mainHandler.postDelayed(() -> {
-                            if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
-                        }, 12000);
-                        return;
-                    }
-
-                    if ("NO_TRADE".equals(biasState) || (effectiveSeconds >= 0 && effectiveSeconds < 5)) {
-                        bubble.setText("NO TRADE\n" + (effectiveSeconds >= 0 ? Math.round(effectiveSeconds) + "s" : ""));
-                        armed = false;
-                        analyzing = false;
-                        scanSessionId = null;
-
-                        mainHandler.postDelayed(() -> {
-                            if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
-                        }, 7000);
-                        return;
-                    }
-
-                    if ("UNSTABLE".equals(biasState)) {
-                        bubble.setText("UNSTABLE\nSCANNING");
+                    if ("NO_TRADE".equals(biasState)) {
+                        // One transient unreadable/weak frame must not stop the armed workflow.
+                        // Keep scanning until the local final-window watcher reaches T-2.
+                        heldCandidateReady = false;
+                        bubble.setText("CHECKING\nKEEP SCAN");
+                    } else if ("UNSTABLE".equals(biasState)) {
+                        bubble.setText("UNSTABLE\nKEEP SCAN");
                     } else {
-                        String time = effectiveSeconds >= 0 ? Math.round(effectiveSeconds) + "s" : "";
-                        bubble.setText("SCANNING " + time + "\n↑" + up + "%  ↓" + down + "%");
+                        String time = remainingMs > 0 ? Math.max(0, Math.round(remainingMs / 1000f)) + "s" : "";
+                        String held = heldCandidateReady ? " • HELD " + heldDirection : "";
+                        bubble.setText("SCANNING " + time + "\nNEXT" + held);
                     }
 
                     analyzing = false;
 
-                    long delayMs;
-                    if (effectiveSeconds > 20) delayMs = 4000;
-                    else if (effectiveSeconds > 12) delayMs = 2200;
-                    else delayMs = 900;
+                    if (!armed) return;
 
-                    mainHandler.postDelayed(() -> {
-                        if (armed && !analyzing && bubble != null) captureAndAnalyze();
-                    }, delayMs);
+                    // Do not start a new cloud analysis inside the final ~9 seconds.
+                    // The locally held candidate is released by finalWindowWatcher at T-5..T-2.
+                    if (remainingMs > 9000 || remainingMs < 0) {
+                        long delayMs;
+                        if (remainingMs > 30000) delayMs = 4500;
+                        else if (remainingMs > 22000) delayMs = 3000;
+                        else if (remainingMs > 14000) delayMs = 1400;
+                        else delayMs = 500;
+
+                        mainHandler.postDelayed(() -> {
+                            if (armed && !analyzing && bubble != null) captureAndAnalyze();
+                        }, delayMs);
+                    }
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
                     if (bubble == null) return;
                     bubble.setVisibility(View.VISIBLE);
-                    bubble.setText("!\nERROR");
+                    bubble.setText("RETRYING\nSCAN");
                     bubble.setContentDescription(e.getMessage());
                     analyzing = false;
 
                     if (armed) {
                         mainHandler.postDelayed(() -> {
                             if (armed && !analyzing && bubble != null) captureAndAnalyze();
-                        }, 1800);
+                        }, 1200);
                     }
                 });
             }

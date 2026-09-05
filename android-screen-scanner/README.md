@@ -1,23 +1,30 @@
-# TradeTrack Live Android Screen Scanner v1.3
+# TradeTrack Live Android Screen Scanner v1.4
 
-## Continuous-confidence workflow
+## Exact workflow
 
-Tap **TT SCAN once** while the current candle still has time left (ideally around 20-40 seconds).
+1. Open Quotex and keep the running M1 candle visible.
+2. Tap **TT SCAN once** when the running candle has roughly **50-30 seconds left**.
+3. The app stays ARMED and builds context from the running candle.
+4. It verifies the same running candle again around the last **20-10 seconds**.
+5. A stable next-candle candidate is held locally so cloud latency does not make the result appear after the candle changes.
+6. Only around **T-5 to T-2** does the overlay reveal:
 
-The scanner stays armed and keeps analyzing the same running candle. It does not release a trade direction immediately.
+   NEXT ↑ UP
+   or
+   NEXT ↓ DOWN
 
-A final signal is released only when all of these are true:
-- the estimated current-candle time remaining is inside the final **5-10 second** window,
-- next-candle UP/DOWN confirmation is strong,
-- evidence score and independent confirmations are sufficient,
-- late-candle instability is below the safety threshold.
+7. If the late candle becomes unstable or a fresh confirmation is not available, the app returns **NO TRADE**.
 
-If the window is missed or the candle becomes unstable, the scanner returns **NO TRADE** instead of chasing.
+The running candle is evidence only. The UP/DOWN direction always targets the **NEXT candle**.
 
-The running candle is evidence only. Every displayed UP/DOWN signal targets the **NEXT candle**.
+## v1.4 timing changes
 
-## Learning data
+- Full context scan uses 3 frames.
+- Later verification scans use a smaller single frame to reduce latency.
+- The bubble is hidden only while capturing, then shows **ANALYZING NEXT** during network/model processing.
+- Backend estimates the current candle close time from the visible timer.
+- Android keeps the close timestamp locally and releases the held candidate at T-5..T-2.
+- A candidate used for final display must come from a late scan (source timer <= 15 seconds) and pass the stability threshold.
+- One weak/unreadable frame does not stop the armed workflow; the scanner keeps checking until the final window.
 
-Each scan session sends pattern codes, psychology codes, range state, structure, candle-size class, end-candle instability, and timing metadata to the TradeTrack Live behavior-learning backend.
-
-The scanner does not tap broker buttons or place trades.
+No automatic trade is placed.
