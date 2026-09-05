@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,7 +50,11 @@ public class CaptureService extends Service {
     private VirtualDisplay virtualDisplay;
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private boolean analyzing = false;
+    private boolean armed = false;
+    private String scanSessionId = null;
+    private int scanAttempt = 0;
     private boolean stopping = false;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onCreate() {
@@ -174,7 +179,10 @@ public class CaptureService extends Service {
                     return true;
 
                 case MotionEvent.ACTION_UP:
-                    if (!moved[0]) captureAndAnalyze();
+                    if (!moved[0]) {
+                        if (armed) cancelArmedScan();
+                        else armScanner();
+                    }
                     return true;
             }
             return false;
@@ -183,36 +191,59 @@ public class CaptureService extends Service {
         windowManager.addView(bubble, bubbleParams);
     }
 
+    private void armScanner() {
+        if (imageReader == null || bubble == null) return;
+        armed = true;
+        scanAttempt = 0;
+        scanSessionId = UUID.randomUUID().toString();
+        bubble.setText("ARMED\nSCANNING");
+        bubble.setContentDescription("Scanner armed. It will keep analyzing until the final signal window.");
+        captureAndAnalyze();
+    }
+
+    private void cancelArmedScan() {
+        armed = false;
+        scanSessionId = null;
+        scanAttempt = 0;
+        if (bubble != null) {
+            bubble.setVisibility(View.VISIBLE);
+            bubble.setText("TT\nSCAN");
+            bubble.setContentDescription("Scanner cancelled");
+        }
+    }
+
     private void captureAndAnalyze() {
-        if (analyzing || imageReader == null || bubble == null) return;
+        if (!armed || analyzing || imageReader == null || bubble == null) return;
 
         analyzing = true;
-        bubble.setText("NEXT\nSCANNING");
+        scanAttempt++;
+        final String thisSessionId = scanSessionId;
+        final String analysisMode = scanAttempt == 1 ? "full" : "verify";
+        bubble.setText("SCANNING\n" + scanAttempt);
         bubble.setVisibility(View.INVISIBLE);
 
         io.submit(() -> {
             try {
-                final int frameIntervalMs = 1800;
+                final int frameIntervalMs = analysisMode.equals("full") ? 900 : 650;
+                final int targetFrames = analysisMode.equals("full") ? 3 : 2;
                 List<byte[]> frames = new ArrayList<>();
                 int outWidth = 0;
                 int outHeight = 0;
 
-                // Three short-spaced frames let the backend compare live candle movement,
-                // wick growth, rejection and breakout acceptance instead of judging one still image.
-                for (int i = 0; i < 3; i++) {
-                    if (i == 0) Thread.sleep(220);
+                for (int i = 0; i < targetFrames; i++) {
+                    if (i == 0) Thread.sleep(180);
                     else Thread.sleep(frameIntervalMs);
 
                     Bitmap raw = acquireLatestBitmap();
                     if (raw == null) continue;
 
                     Bitmap cropped = cropForAnalysis(raw);
-                    Bitmap scaled = scaleForUpload(cropped, 1080);
+                    Bitmap scaled = scaleForUpload(cropped, 900);
                     outWidth = scaled.getWidth();
                     outHeight = scaled.getHeight();
 
                     ByteArrayOutputStream bos = new ByteArrayOutputStream();
-                    scaled.compress(Bitmap.CompressFormat.JPEG, 84, bos);
+                    scaled.compress(Bitmap.CompressFormat.JPEG, 78, bos);
                     frames.add(bos.toByteArray());
 
                     if (scaled != cropped) scaled.recycle();
@@ -222,57 +253,92 @@ public class CaptureService extends Service {
 
                 if (frames.isEmpty()) throw new IOException("Unable to capture Quotex screen");
 
-                JSONObject result = postFrames(frames, outWidth, outHeight, frameIntervalMs);
+                JSONObject result = postFrames(
+                        frames, outWidth, outHeight, frameIntervalMs, thisSessionId, analysisMode
+                );
                 JSONObject scan = result.optJSONObject("scan");
                 if (scan == null) throw new IOException(result.optString("error", "No scan result"));
 
                 String decision = scan.optString("decision", "SKIP").toUpperCase();
                 int up = (int) Math.round(scan.optDouble("upConfirmation", 50));
                 int down = (int) Math.round(scan.optDouble("downConfirmation", 50));
-                String biasState = scan.optString("biasState", "WATCH").toUpperCase();
-                int secondsLeft = (int) Math.round(scan.optDouble("secondsToCandleClose", -1));
+                String biasState = scan.optString("biasState", "SCANNING").toUpperCase();
+                double effectiveSeconds = scan.optDouble("effectiveSecondsToCandleClose", -1);
+                boolean shouldSignalNow = scan.optBoolean("shouldSignalNow", false);
+                int instability = (int) Math.round(scan.optDouble("endInstabilityScore", 0));
                 String asset = scan.optString("asset", "—");
                 int payout = (int) Math.round(scan.optDouble("payout", 0));
                 String rationale = scan.optString("rationale", "");
 
-                new Handler(Looper.getMainLooper()).post(() -> {
+                mainHandler.post(() -> {
                     if (bubble == null) return;
-                    bubble.setVisibility(View.VISIBLE);
-
-                    String status;
-                    if ("WAIT_T10".equals(biasState)) {
-                        status = "WAIT T-10";
-                        bubble.setText(secondsLeft > 12 ? "WAIT\nT-10s" : "WAIT\nT-10");
-                    } else if ("TOO_LATE".equals(biasState)) {
-                        status = "TOO LATE";
-                        bubble.setText("TOO\nLATE");
-                    } else {
-                        if ("UP".equals(decision)) status = "UP";
-                        else if ("DOWN".equals(decision)) status = "DOWN";
-                        else status = "WATCH";
-                        bubble.setText("NEXT  ↑" + up + "%  ↓" + down + "%\n" + status);
+                    if (!armed || thisSessionId == null || !thisSessionId.equals(scanSessionId)) {
+                        analyzing = false;
+                        return;
                     }
 
+                    bubble.setVisibility(View.VISIBLE);
                     bubble.setContentDescription(
-                            asset + " " + payout + "%. Target NEXT candle. UP confirmation " + up +
-                                    "%, DOWN confirmation " + down + "%, " + status + ". " + rationale
+                            asset + " " + payout + "%. NEXT candle. UP " + up + "%, DOWN " + down +
+                                    "%. Instability " + instability + ". " + rationale
                     );
+
+                    if (shouldSignalNow && ("UP".equals(decision) || "DOWN".equals(decision))) {
+                        String arrow = "UP".equals(decision) ? "↑" : "↓";
+                        bubble.setText("NEXT " + arrow + " " + decision + "\n↑" + up + "%  ↓" + down + "%");
+                        armed = false;
+                        analyzing = false;
+                        scanSessionId = null;
+
+                        mainHandler.postDelayed(() -> {
+                            if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
+                        }, 12000);
+                        return;
+                    }
+
+                    if ("NO_TRADE".equals(biasState) || (effectiveSeconds >= 0 && effectiveSeconds < 5)) {
+                        bubble.setText("NO TRADE\n" + (effectiveSeconds >= 0 ? Math.round(effectiveSeconds) + "s" : ""));
+                        armed = false;
+                        analyzing = false;
+                        scanSessionId = null;
+
+                        mainHandler.postDelayed(() -> {
+                            if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
+                        }, 7000);
+                        return;
+                    }
+
+                    if ("UNSTABLE".equals(biasState)) {
+                        bubble.setText("UNSTABLE\nSCANNING");
+                    } else {
+                        String time = effectiveSeconds >= 0 ? Math.round(effectiveSeconds) + "s" : "";
+                        bubble.setText("SCANNING " + time + "\n↑" + up + "%  ↓" + down + "%");
+                    }
+
                     analyzing = false;
 
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        if (bubble != null && !analyzing) bubble.setText("TT\nSCAN");
-                    }, 14000);
+                    long delayMs;
+                    if (effectiveSeconds > 20) delayMs = 4000;
+                    else if (effectiveSeconds > 12) delayMs = 2200;
+                    else delayMs = 900;
+
+                    mainHandler.postDelayed(() -> {
+                        if (armed && !analyzing && bubble != null) captureAndAnalyze();
+                    }, delayMs);
                 });
             } catch (Exception e) {
-                new Handler(Looper.getMainLooper()).post(() -> {
+                mainHandler.post(() -> {
                     if (bubble == null) return;
                     bubble.setVisibility(View.VISIBLE);
                     bubble.setText("!\nERROR");
                     bubble.setContentDescription(e.getMessage());
                     analyzing = false;
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        if (bubble != null && !analyzing) bubble.setText("TT\nSCAN");
-                    }, 5000);
+
+                    if (armed) {
+                        mainHandler.postDelayed(() -> {
+                            if (armed && !analyzing && bubble != null) captureAndAnalyze();
+                        }, 1800);
+                    }
                 });
             }
         });
@@ -328,7 +394,14 @@ public class CaptureService extends Service {
         return Bitmap.createScaledBitmap(input, maxWidth, h, true);
     }
 
-    private JSONObject postFrames(List<byte[]> frames, int width, int height, int frameIntervalMs) throws Exception {
+    private JSONObject postFrames(
+            List<byte[]> frames,
+            int width,
+            int height,
+            int frameIntervalMs,
+            String scanSessionId,
+            String analysisMode
+    ) throws Exception {
         SharedPreferences prefs = getSharedPreferences("ttl_scanner", MODE_PRIVATE);
         String token = prefs.getString("bridgeToken", "");
         if (token == null || token.trim().isEmpty()) throw new IOException("Scanner Token missing");
@@ -349,6 +422,8 @@ public class CaptureService extends Service {
             writeField(out, boundary, "imageWidth", String.valueOf(width));
             writeField(out, boundary, "imageHeight", String.valueOf(height));
             writeField(out, boundary, "frameIntervalMs", String.valueOf(frameIntervalMs));
+            writeField(out, boundary, "scanSessionId", scanSessionId == null ? "" : scanSessionId);
+            writeField(out, boundary, "analysisMode", analysisMode == null ? "full" : analysisMode);
 
             String[] names = {"frame", "frame2", "frame3"};
             for (int i = 0; i < frames.size() && i < names.length; i++) {
@@ -425,6 +500,9 @@ public class CaptureService extends Service {
     private void cleanupScanner(boolean stopProjection) {
         if (stopping) return;
         stopping = true;
+        armed = false;
+        analyzing = false;
+        scanSessionId = null;
 
         try { if (bubble != null) windowManager.removeView(bubble); } catch (Exception ignored) {}
         bubble = null;

@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
         root.setGravity(Gravity.TOP);
 
         TextView title = text("TradeTrack Live Scanner", 24, Color.WHITE, true);
-        TextView subtitle = text("Tap at T-10s → predict NEXT candle only", 13, Color.rgb(148,163,184), false);
+        TextView subtitle = text("Tap once → continuous scan → NEXT candle signal at T-5…T-10", 13, Color.rgb(148,163,184), false);
 
         tokenInput = new EditText(this);
         tokenInput.setHint("Paste 8-hour Scanner Token");
@@ -71,8 +71,8 @@ public class MainActivity extends Activity {
         TextView note = text(
                 "How it works:\n1. Create a Scanner Token in TradeTrack Live → Phone Screen Scan.\n" +
                 "2. Paste it here.\n3. Enable screen capture and overlay permission.\n" +
-                "4. Open Quotex Broker App.\n5. Tap TT Scan at about 10 seconds before the CURRENT candle closes.\n\n" +
-                "The scanner uses the running candle only as evidence and predicts the NEXT candle. Tap too early and it will show WAIT T-10.",
+                "4. Open Quotex Broker App.\n5. Tap TT Scan once while the current candle still has time left (ideally about 20–40s).\n\n" +
+                "The scanner stays ARMED and keeps analyzing. It only releases a NEXT-candle UP/DOWN signal inside the final 5–10s window when confirmation is strong enough; otherwise it shows NO TRADE.",
                 12, Color.rgb(148,163,184), false
         );
 

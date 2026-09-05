@@ -1,32 +1,23 @@
-# TradeTrack Live Android Screen Scanner v1.2
+# TradeTrack Live Android Screen Scanner v1.3
 
-This version targets the **NEXT candle only**.
+## Continuous-confidence workflow
 
-## Timing
+Tap **TT SCAN once** while the current candle still has time left (ideally around 20-40 seconds).
 
-Tap **TT SCAN at about T-10 seconds** before the current candle closes.
+The scanner stays armed and keeps analyzing the same running candle. It does not release a trade direction immediately.
 
-The scanner:
-1. Captures 3 short-spaced chart frames.
-2. Uses the current running candle only as evidence.
-3. Tracks wick/body evolution, rejection, momentum, support/resistance and candle-sequence psychology.
-4. Returns the directional confirmation for the **NEXT candle**.
+A final signal is released only when all of these are true:
+- the estimated current-candle time remaining is inside the final **5-10 second** window,
+- next-candle UP/DOWN confirmation is strong,
+- evidence score and independent confirmations are sufficient,
+- late-candle instability is below the safety threshold.
 
-If you tap too early, the overlay shows **WAIT T-10**.
-If you tap too late, it shows **TOO LATE**.
+If the window is missed or the candle becomes unstable, the scanner returns **NO TRADE** instead of chasing.
 
-## Overlay
+The running candle is evidence only. Every displayed UP/DOWN signal targets the **NEXT candle**.
 
-Examples:
+## Learning data
 
-NEXT ↑72% ↓28%
-UP
-
-or
-
-NEXT ↑41% ↓59%
-WATCH
-
-UP/DOWN percentages are confirmation weights from visible evidence, not guaranteed win probabilities.
+Each scan session sends pattern codes, psychology codes, range state, structure, candle-size class, end-candle instability, and timing metadata to the TradeTrack Live behavior-learning backend.
 
 The scanner does not tap broker buttons or place trades.
