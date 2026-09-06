@@ -1,4 +1,3 @@
-const token=document.getElementById("token");
 const asset=document.getElementById("asset");
 const payout=document.getElementById("payout");
 const state=document.getElementById("state");
@@ -34,12 +33,11 @@ async function render(s={}){
 }
 
 document.getElementById("save").addEventListener("click",async()=>{
-  await chrome.storage.session.set({bridgeToken:token.value.trim()});
   await chrome.storage.local.set({
     assetOverride:asset.value.trim(),
     payoutOverride:payout.value.trim()
   });
-  state.textContent="TOKEN SAVED";
+  state.textContent="SETTINGS SAVED";
 });
 
 document.getElementById("arm").addEventListener("click",async()=>{
@@ -58,11 +56,7 @@ document.getElementById("arm").addEventListener("click",async()=>{
 });
 
 (async()=>{
-  const [sess,loc]=await Promise.all([
-    chrome.storage.session.get(["bridgeToken"]),
-    chrome.storage.local.get(["assetOverride","payoutOverride","ttlPcScannerStatus"])
-  ]);
-  token.value=sess.bridgeToken||"";
+  const loc=await chrome.storage.local.get(["assetOverride","payoutOverride","ttlPcScannerStatus"]);
   asset.value=loc.assetOverride||"";
   payout.value=loc.payoutOverride||"";
   render(loc.ttlPcScannerStatus||{});
