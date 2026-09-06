@@ -222,13 +222,6 @@
   }
 
   async function arm(){
-    const tokenState=await chrome.storage.session.get(["bridgeToken"]);
-    if(!String(tokenState.bridgeToken||"").trim()){
-      setBubble("TOKEN\nREQUIRED","error");
-      await updateStatus({finalState:"TOKEN_REQUIRED"});
-      return;
-    }
-
     armed=true;analyzing=false;attempt=0;
     scanSessionId=(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random());
     estimatedCloseEpochMs=0;heldCandidateReady=false;heldDirection="";
