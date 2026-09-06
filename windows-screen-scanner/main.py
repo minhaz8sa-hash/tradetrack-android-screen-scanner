@@ -12,7 +12,7 @@ from PIL import Image
 
 ENDPOINT = "https://base44.app/api/apps/6a1d6d69aab915d09b7b082d/functions/analyzeMobileScreenCapture"
 APP_ID = "6a1d6d69aab915d09b7b082d"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 
 class TradeTrackWindowsScanner:
@@ -25,7 +25,9 @@ class TradeTrackWindowsScanner:
         self.root.protocol("WM_DELETE_WINDOW", self.close_app)
 
         self.lock = threading.RLock()
-        self.session = requests.Session()
+        self.session = self.make_session()
+        self.failure_count = 0
+        self.last_error = ""
 
         self.sharing = False
         self.armed = False
@@ -56,6 +58,36 @@ class TradeTrackWindowsScanner:
 
         self.build_ui()
         self.refresh_monitors()
+
+    def make_session(self):
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": f"TradeTrackWindowsScanner/{VERSION}",
+            "Connection": "close",
+        })
+        return session
+
+    def reset_session(self):
+        try:
+            self.session.close()
+        except Exception:
+            pass
+        self.session = self.make_session()
+
+    def retry_profile(self, exc):
+        message = str(exc or "Unknown scanner error")
+        lower = message.lower()
+        if "429" in lower or "too many" in lower or "rate" in lower:
+            return 8.0, "SERVER BUSY\nRETRY 8s"
+        if "timeout" in lower or "timed out" in lower:
+            return 5.0, "NETWORK\nRETRY 5s"
+        if "connection" in lower or "dns" in lower or "name resolution" in lower:
+            return 4.0, "NETWORK\nRETRY 4s"
+        if "http 5" in lower or "server" in lower or "temporar" in lower:
+            return 5.0, "SERVER\nRETRY 5s"
+        if "capture" in lower or "display" in lower:
+            return 2.0, "CAPTURE\nRETRY 2s"
+        return 3.0, "RETRYING\nSCAN"
 
     def build_ui(self):
         header = tk.Frame(self.root, bg="#0e1117")
@@ -361,6 +393,8 @@ class TradeTrackWindowsScanner:
             self.armed = True
             self.analyzing = False
             self.scan_attempt = 0
+            self.failure_count = 0
+            self.last_error = ""
             self.scan_session_id = str(uuid.uuid4())
             self.estimated_close_ms = 0
             self.held_candidate_ready = False
@@ -431,16 +465,49 @@ class TradeTrackWindowsScanner:
                 scan = result.get("scan") or {}
                 if not scan:
                     raise RuntimeError(result.get("error") or "No scan result")
+
+                with self.lock:
+                    self.failure_count = 0
+                    self.last_error = ""
+
                 delay = self.process_scan(scan)
+
             except Exception as exc:
                 with self.lock:
                     self.analyzing = False
                     still_armed = self.armed
+                    self.failure_count += 1
+                    failures = self.failure_count
+                    self.last_error = str(exc)
+
                 if not still_armed:
                     return
-                self.set_bubble("RETRYING\nSCAN", "warn")
-                self.set_status("Scanner retrying", str(exc))
-                delay = 1.2
+
+                retry_delay, retry_text = self.retry_profile(exc)
+
+                # Recreate the HTTP session after repeated failures so a stale
+                # keep-alive/socket cannot trap the scanner in RETRYING forever.
+                if failures >= 2:
+                    self.reset_session()
+
+                if failures >= 6:
+                    with self.lock:
+                        self.armed = False
+                        self.analyzing = False
+                        self.scan_session_id = ""
+                    self.set_bubble("SCAN ERROR\nTAP AGAIN", "error")
+                    self.set_status(
+                        "Scan stopped after repeated errors",
+                        f"{exc} — connection was reset. Tap TT SCAN again after checking internet/Quotex.",
+                    )
+                    return
+
+                self.set_bubble(retry_text, "warn")
+                self.set_status(
+                    f"Scanner retrying ({failures}/6)",
+                    f"{exc} — automatic retry in {int(retry_delay)}s.",
+                )
+                delay = retry_delay
 
             with self.lock:
                 self.analyzing = False
@@ -520,17 +587,30 @@ class TradeTrackWindowsScanner:
         for i, frame in enumerate(frames[:3]):
             files[names[i]] = (f"windows-screen-{i+1}.jpg", frame, "image/jpeg")
 
-        response = self.session.post(
-            ENDPOINT,
-            headers={"X-App-Id": APP_ID},
-            data=data,
-            files=files,
-            timeout=(10, 32),
-        )
+        try:
+            response = self.session.post(
+                ENDPOINT,
+                headers={"X-App-Id": APP_ID},
+                data=data,
+                files=files,
+                timeout=(12, 60),
+            )
+        except requests.exceptions.Timeout as exc:
+            raise RuntimeError("Network timeout while waiting for screen analysis") from exc
+        except requests.exceptions.ConnectionError as exc:
+            raise RuntimeError("Network connection error while sending screen capture") from exc
+        except requests.exceptions.RequestException as exc:
+            raise RuntimeError(f"Network request failed: {exc}") from exc
+
         try:
             payload = response.json()
         except Exception:
             raise RuntimeError(f"Invalid server response (HTTP {response.status_code})")
+
+        if response.status_code == 429:
+            raise RuntimeError(payload.get("error") or "HTTP 429 — analysis service rate limit")
+        if response.status_code >= 500:
+            raise RuntimeError(payload.get("error") or f"HTTP {response.status_code} — analysis server temporarily unavailable")
         if not response.ok or not payload.get("success"):
             raise RuntimeError(payload.get("error") or f"HTTP {response.status_code}")
         return payload
