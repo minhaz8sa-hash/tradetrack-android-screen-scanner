@@ -2,11 +2,6 @@ const ENDPOINT="https://base44.app/api/apps/6a1d6d69aab915d09b7b082d/functions/a
 const APP_ID="6a1d6d69aab915d09b7b082d";
 const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
 
-async function getSessionToken(){
-  const r=await chrome.storage.session.get(["bridgeToken"]);
-  return String(r.bridgeToken||"").trim();
-}
-
 async function captureActiveQuotex(senderTab, quality=75){
   if(!senderTab?.id || !senderTab?.windowId) throw new Error("Quotex tab not available.");
   const [active]=await chrome.tabs.query({active:true,windowId:senderTab.windowId});
@@ -20,11 +15,7 @@ async function dataUrlToBlob(dataUrl){
 }
 
 async function postFrames({frames,mode,scanSessionId,assetHint,payoutHint}){
-  const token=await getSessionToken();
-  if(!token) throw new Error("Scanner Token required. Open the extension popup and save your 8-hour token.");
-
   const form=new FormData();
-  form.append("bridgeToken",token);
   form.append("capturedAt",new Date().toISOString());
   form.append("analysisMode",mode||"full");
   form.append("scanSessionId",scanSessionId||"");
@@ -42,7 +33,7 @@ async function postFrames({frames,mode,scanSessionId,assetHint,payoutHint}){
   try{
     const res=await fetch(ENDPOINT,{
       method:"POST",
-      headers:{"X-App-Id":APP_ID,"X-Bridge-Token":token},
+      headers:{"X-App-Id":APP_ID},
       body:form,
       signal:controller.signal
     });
