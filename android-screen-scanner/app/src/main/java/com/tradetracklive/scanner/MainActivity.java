@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
@@ -14,14 +13,12 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
     private static final int REQ_CAPTURE = 1201;
     private MediaProjectionManager projectionManager;
-    private EditText tokenInput;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,8 +29,6 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 99);
         }
 
-        SharedPreferences prefs = getSharedPreferences("ttl_scanner", MODE_PRIVATE);
-
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(20), dp(28), dp(20), dp(24));
@@ -42,21 +37,6 @@ public class MainActivity extends Activity {
 
         TextView title = text("TradeTrack Live Scanner", 24, Color.WHITE, true);
         TextView subtitle = text("Tap once at T-50…T-30 → keep scanning → NEXT candle at T-5…T-2", 13, Color.rgb(148,163,184), false);
-
-        tokenInput = new EditText(this);
-        tokenInput.setHint("Paste 8-hour Scanner Token");
-        tokenInput.setHintTextColor(Color.rgb(100,116,139));
-        tokenInput.setTextColor(Color.WHITE);
-        tokenInput.setSingleLine(true);
-        tokenInput.setText(prefs.getString("bridgeToken", ""));
-        tokenInput.setBackgroundColor(Color.rgb(24,30,39));
-        tokenInput.setPadding(dp(12),0,dp(12),0);
-
-        Button save = button("Save Token");
-        save.setOnClickListener(v -> {
-            prefs.edit().putString("bridgeToken", tokenInput.getText().toString().trim()).apply();
-            save.setText("Saved ✓");
-        });
 
         Button start = button("Enable Screen Share + Floating TT Scan");
         start.setOnClickListener(v -> startScanner());
@@ -69,17 +49,14 @@ public class MainActivity extends Activity {
         });
 
         TextView note = text(
-                "How it works:\n1. Create a Scanner Token in TradeTrack Live → Phone Screen Scan.\n" +
-                "2. Paste it here.\n3. Enable screen capture and overlay permission.\n" +
-                "4. Open Quotex Broker App.\n5. Tap TT Scan once when the running candle has roughly 50–30s left.\n\n" +
+                "How it works:\n1. Enable screen capture and overlay permission.\n" +
+                "2. Open Quotex Broker App.\n3. Tap TT Scan once when the running candle has roughly 50–30s left.\n\n" +
                 "The scanner builds context, verifies again around the last 20–10s, then holds the result locally. Only at about 5–2s before the running candle closes will it show the NEXT-candle UP/DOWN signal. If the late candle becomes unstable or confirmation is not fresh, it shows NO TRADE.",
                 12, Color.rgb(148,163,184), false
         );
 
         root.addView(title, lp(-1, dp(42), 0));
         root.addView(subtitle, lp(-1, dp(42), 0));
-        root.addView(tokenInput, lp(-1, dp(48), dp(12)));
-        root.addView(save, lp(-1, dp(48), dp(10)));
         root.addView(start, lp(-1, dp(52), dp(18)));
         root.addView(stop, lp(-1, dp(48), dp(10)));
         root.addView(note, lp(-1, ViewGroup.LayoutParams.WRAP_CONTENT, dp(20)));
@@ -87,13 +64,6 @@ public class MainActivity extends Activity {
     }
 
     private void startScanner() {
-        String token = tokenInput.getText().toString().trim();
-        if (token.isEmpty()) {
-            tokenInput.setError("Scanner Token required");
-            return;
-        }
-        getSharedPreferences("ttl_scanner", MODE_PRIVATE).edit().putString("bridgeToken", token).apply();
-
         if (!Settings.canDrawOverlays(this)) {
             Intent overlay = new Intent(
                     Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
