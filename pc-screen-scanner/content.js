@@ -101,11 +101,7 @@
   }
 
   async function getHints(){
-    const r=await chrome.storage.local.get(["assetOverride","payoutOverride"]);
-    return {
-      assetHint:String(r.assetOverride||"").trim(),
-      payoutHint:String(r.payoutOverride||"").trim()
-    };
+    return {assetHint:"",payoutHint:""};
   }
 
   function scheduleNext(delay){
@@ -163,11 +159,13 @@
     }
 
     const sourceSeconds=Number(scan.secondsToCandleClose);
+    const effectiveSeconds=Number(scan.effectiveSecondsToCandleClose);
     const up=Math.round(Number(scan.upConfirmation||50));
     const down=Math.round(Number(scan.downConfirmation||50));
     const instability=Math.round(Number(scan.endInstabilityScore||100));
     const candidateReady=!!scan.candidateReady;
     const candidateDirection=String(scan.candidateDirection||"SKIP").toUpperCase();
+    const shouldSignalNow=!!scan.shouldSignalNow;
     const closeAt=String(scan.estimatedCandleCloseAt||"");
     const biasState=String(scan.biasState||"SCANNING").toUpperCase();
 
@@ -191,6 +189,19 @@
       heldDirection="";
     }
 
+    if(
+      shouldSignalNow &&
+      heldCandidateReady &&
+      Number.isFinite(effectiveSeconds) &&
+      effectiveSeconds<=5 &&
+      effectiveSeconds>=2
+    ){
+      analyzing=false;
+      releaseHeldSignal();
+      await updateStatus({lastScan:scan,lastError:null,finalState:"SIGNAL"});
+      return;
+    }
+
     const remaining=estimatedCloseEpochMs?estimatedCloseEpochMs-Date.now():-1;
     const secs=remaining>0?Math.max(0,Math.round(remaining/1000)):"";
 
@@ -199,8 +210,11 @@
     }else if(biasState==="NO_TRADE"){
       setBubble("CHECKING\nKEEP SCAN","warn");
       heldCandidateReady=false;
+    }else if(heldCandidateReady){
+      const arrow=heldDirection==="UP"?"↑":"↓";
+      setBubble("HELD "+arrow+" "+heldDirection+" "+heldUp+"%\nVERIFYING "+(secs!==""?secs+"s":""));
     }else{
-      setBubble("SCANNING "+(secs!==""?secs+"s":"")+"\nNEXT"+(heldCandidateReady?" • HELD "+heldDirection:""));
+      setBubble("SCANNING "+(secs!==""?secs+"s":"")+"\nNEXT");
     }
 
     analyzing=false;
@@ -246,7 +260,12 @@
     if(msg?.type==="TTL_PC_CAPTURE_DONE"){
       if(armed){
         bubble.style.visibility="visible";
-        setBubble("ANALYZING\nNEXT");
+        if(heldCandidateReady){
+          const arrow=heldDirection==="UP"?"↑":"↓";
+          setBubble("HELD "+arrow+" "+heldDirection+"\nVERIFYING");
+        }else{
+          setBubble("ANALYZING\nNEXT");
+        }
       }
       return;
     }
