@@ -1,1 +1,1 @@
-Trigger Android APK build.
+Build TradeTrack Android Scanner token-free v1.4.1
