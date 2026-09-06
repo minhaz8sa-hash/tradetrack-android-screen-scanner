@@ -3,7 +3,6 @@ package com.tradetracklive.scanner;
 import android.app.*;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.*;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.display.DisplayManager;
@@ -515,10 +514,6 @@ public class CaptureService extends Service {
             String scanSessionId,
             String analysisMode
     ) throws Exception {
-        SharedPreferences prefs = getSharedPreferences("ttl_scanner", MODE_PRIVATE);
-        String token = prefs.getString("bridgeToken", "");
-        if (token == null || token.trim().isEmpty()) throw new IOException("Scanner Token missing");
-
         String boundary = "----TTL" + System.currentTimeMillis();
         HttpURLConnection conn = (HttpURLConnection) new URL(ENDPOINT).openConnection();
         conn.setConnectTimeout(10000);
@@ -526,11 +521,9 @@ public class CaptureService extends Service {
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
         conn.setRequestProperty("X-App-Id", APP_ID);
-        conn.setRequestProperty("X-Bridge-Token", token);
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
-            writeField(out, boundary, "bridgeToken", token);
             writeField(out, boundary, "capturedAt", Instant.now().toString());
             writeField(out, boundary, "imageWidth", String.valueOf(width));
             writeField(out, boundary, "imageHeight", String.valueOf(height));
