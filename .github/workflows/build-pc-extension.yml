@@ -1,0 +1,26 @@
+name: Build PC Scanner Extension
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "pc-screen-scanner/**"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package Chrome extension
+        run: |
+          cd pc-screen-scanner
+          zip -r ../TradeTrack-PC-Scanner-v1.0.0.zip .
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeTrack-PC-Scanner-v1.0.0
+          path: TradeTrack-PC-Scanner-v1.0.0.zip
+          if-no-files-found: error
