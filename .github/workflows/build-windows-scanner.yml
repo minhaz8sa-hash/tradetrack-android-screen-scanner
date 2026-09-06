@@ -1,0 +1,37 @@
+name: Build Windows Screen Scanner
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "windows-screen-scanner/**"
+      - ".github/workflows/build-windows-scanner.yml"
+  pull_request:
+    paths:
+      - "windows-screen-scanner/**"
+      - ".github/workflows/build-windows-scanner.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r windows-screen-scanner/requirements.txt
+
+      - name: Build Windows EXE
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name TradeTrack-Windows-Screen-Scanner windows-screen-scanner/main.py
+
+      - name: Upload Windows scanner
+        uses: actions/upload-artifact@v4
+        with:
+          name: TradeTrack-Windows-Screen-Scanner
+          path: dist/TradeTrack-Windows-Screen-Scanner.exe
+          if-no-files-found: error
