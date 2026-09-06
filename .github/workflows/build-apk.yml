@@ -5,6 +5,9 @@ on:
   push:
     paths:
       - "android-screen-scanner/**"
+  pull_request:
+    paths:
+      - "android-screen-scanner/**"
 
 jobs:
   build:
