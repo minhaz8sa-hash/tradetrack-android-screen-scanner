@@ -24,7 +24,7 @@
   bubble.id="tt-pc-scan-bubble";
   bubble.textContent="TT\nSCAN";
   Object.assign(bubble.style,{
-    position:"fixed",right:"22px",top:"190px",width:"118px",height:"88px",
+    position:"fixed",right:"22px",top:"190px",width:"180px",height:"116px",
     zIndex:"2147483647",borderRadius:"20px",border:"1px solid #34d399",
     background:"#0d3227",color:"#fff",font:"700 15px/1.25 Arial,sans-serif",
     whiteSpace:"pre-line",boxShadow:"0 10px 30px rgba(0,0,0,.35)",cursor:"pointer",
@@ -72,12 +72,17 @@
   }
 
   function releaseHeldSignal(){
-    if(!armed||!heldCandidateReady) return;
+    if(!armed||!heldCandidateReady||analyzing) return;
+    const left=estimatedCloseEpochMs-Date.now();
+    if(left<2000||left>5000) return;
     const arrow=heldDirection==="UP"?"↑":"↓";
-    setBubble("NEXT "+arrow+" "+heldDirection+"\n↑"+heldUp+"%  ↓"+heldDown+"%","signal");
-    updateStatus({finalState:"SIGNAL",signalDirection:heldDirection});
+    const entryAt=new Date(estimatedCloseEpochMs).toISOString();
+    const expiresAt=new Date(estimatedCloseEpochMs+60000).toISOString();
+    const fmt=t=>new Date(t).toLocaleTimeString();
+    setBubble("NEXT CANDLE "+arrow+" "+heldDirection+"\n"+heldAsset+"\nEntry "+fmt(entryAt)+"\nEnd "+fmt(expiresAt),"signal");
+    updateStatus({finalState:"SIGNAL",signalDirection:heldDirection,entryAt,expiresAt});
     stopState();
-    resetAfter(12000);
+    resetAfter(Math.max(0,left));
   }
 
   function finishNoTrade(reason){
@@ -92,7 +97,7 @@
     watcher=setInterval(()=>{
       if(!armed||!estimatedCloseEpochMs) return;
       const remaining=estimatedCloseEpochMs-Date.now();
-      if(remaining<=5000 && remaining>=2000 && heldCandidateReady && heldSourceSeconds>=0 && heldSourceSeconds<=15){
+      if(remaining<=5000 && remaining>=2000 && heldCandidateReady && heldSourceSeconds>=10 && heldSourceSeconds<=20 && !analyzing){
         releaseHeldSignal();
       }else if(remaining<2000){
         finishNoTrade("No fresh stable next-candle confirmation before close.");
@@ -136,7 +141,6 @@
     });
 
     if(!armed||thisSession!==scanSessionId){
-      analyzing=false;
       return;
     }
 
@@ -144,6 +148,8 @@
 
     if(!response?.ok){
       analyzing=false;
+      heldCandidateReady=false;
+      if(attempt>=3) { finishNoTrade(response?.error||"Scan failed"); return; }
       setBubble("RETRYING\nSCAN","warn");
       await updateStatus({lastError:response?.error||"Analysis failed"});
       scheduleNext(1200);
@@ -158,6 +164,7 @@
       return;
     }
 
+    if(scan.scanSessionId!==thisSession||scan.targetCandle!=="NEXT_CANDLE"||scan.fatal){ analyzing=false;finishNoTrade(scan.reason||"Candle mismatch");return; }
     const sourceSeconds=Number(scan.secondsToCandleClose);
     const effectiveSeconds=Number(scan.effectiveSecondsToCandleClose);
     const up=Math.round(Number(scan.upConfirmation||50));
@@ -172,19 +179,20 @@
     if(closeAt){
       const parsed=Date.parse(closeAt);
       if(Number.isFinite(parsed)&&parsed>Date.now()){
+        if(estimatedCloseEpochMs && Math.abs(parsed-estimatedCloseEpochMs)>1800){analyzing=false;finishNoTrade("Candle changed");return;}
         estimatedCloseEpochMs=parsed;
         startWatcher();
       }
     }
 
-    if(candidateReady && (candidateDirection==="UP"||candidateDirection==="DOWN") && instability<=45){
+    if(candidateReady && (candidateDirection==="UP"||candidateDirection==="DOWN") && instability<=45 && sourceSeconds>=10 && sourceSeconds<=20){
       heldCandidateReady=true;
       heldDirection=candidateDirection;
       heldUp=up;heldDown=down;heldInstability=instability;
       heldSourceSeconds=sourceSeconds;
       heldAsset=String(scan.asset||"—");
       heldPayout=Math.round(Number(scan.payout||0));
-    }else if(Number.isFinite(sourceSeconds)&&sourceSeconds<=15){
+    }else{
       heldCandidateReady=false;
       heldDirection="";
     }
@@ -198,7 +206,7 @@
     ){
       analyzing=false;
       releaseHeldSignal();
-      await updateStatus({lastScan:scan,lastError:null,finalState:"SIGNAL"});
+
       return;
     }
 
@@ -212,7 +220,7 @@
       heldCandidateReady=false;
     }else if(heldCandidateReady){
       const arrow=heldDirection==="UP"?"↑":"↓";
-      setBubble("HELD "+arrow+" "+heldDirection+" "+heldUp+"%\nVERIFYING "+(secs!==""?secs+"s":""));
+      setBubble("VERIFYING\n"+(secs!==""?secs+"s":""));
     }else{
       setBubble("SCANNING "+(secs!==""?secs+"s":"")+"\nNEXT");
     }
@@ -226,7 +234,7 @@
 
     if(!armed) return;
 
-    if(remaining>9000||remaining<0){
+    if(remaining>10000||remaining<0){
       let delay=500;
       if(remaining>30000) delay=4500;
       else if(remaining>22000) delay=3000;
@@ -236,12 +244,15 @@
   }
 
   async function arm(){
+    if(armed||analyzing) return;
     armed=true;analyzing=false;attempt=0;
     scanSessionId=(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random());
     estimatedCloseEpochMs=0;heldCandidateReady=false;heldDirection="";
     heldSourceSeconds=-1;heldInstability=100;
     setBubble("ARMED\nSCANNING");
     await updateStatus({finalState:"ARMED",lastError:null});
+    const armedSession=scanSessionId;
+    setTimeout(()=>{if(armed&&scanSessionId===armedSession)finishNoTrade("Scan timed out");},65000);
     analyzeOnce();
   }
 
@@ -262,7 +273,7 @@
         bubble.style.visibility="visible";
         if(heldCandidateReady){
           const arrow=heldDirection==="UP"?"↑":"↓";
-          setBubble("HELD "+arrow+" "+heldDirection+"\nVERIFYING");
+          setBubble("VERIFYING\nNEXT CANDLE");
         }else{
           setBubble("ANALYZING\nNEXT");
         }

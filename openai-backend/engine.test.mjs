@@ -1,0 +1,14 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {gate} from './engine.mjs';
+const close=1800000000000;
+const ai={asset:'EUR/USD',marketType:'OTC',timeframe:'M1',chartQuality:'good',isQuotexChart:true,targetCandle:'NEXT_CANDLE',payout:90,upConfirmation:80,downConfirmation:20,setupScore:85,endInstabilityScore:20,confirmations:['level rejection','wick contraction','failed breakout']};
+const obs=(s,prior,changes={},delay=1000)=>gate({...ai,secondsToCandleClose:s,...changes},close-s*1000,close-s*1000+delay,prior);
+test('single observation never qualifies',()=>assert.equal(obs(20).scan.candidateReady,false));
+test('two matching in-window observations qualify for next candle',()=>{const a=obs(20),b=obs(12,a.state);assert.equal(b.scan.candidateReady,true);assert.equal(b.scan.entryAt,new Date(close).toISOString());assert.equal(b.scan.expiresAt,new Date(close+60000).toISOString());});
+test('outside verification window rejected',()=>{for(const s of [21,9])assert.equal(obs(s,obs(20).state).scan.candidateReady,false)});
+test('direction flip resets streak',()=>assert.equal(obs(12,obs(20).state,{upConfirmation:20,downConfirmation:80}).scan.candidateReady,false));
+test('wrong asset terminates session',()=>assert.equal(obs(12,obs(20).state,{asset:'GBP/USD'}).scan.fatal,true));
+test('rollover cannot migrate target',()=>{const a=obs(20);const b=gate({...ai,secondsToCandleClose:55},close+5000,close+6000,a.state);assert.equal(b.scan.fatal,true);assert.equal(b.scan.candidateReady,false)});
+test('response past release deadline rejected',()=>assert.equal(obs(10,obs(20).state,{},9000).scan.candidateReady,false));
+test('current candle target rejected',()=>assert.equal(obs(12,obs(20).state,{targetCandle:'CURRENT_CANDLE'}).scan.candidateReady,false));
+test('unstable or unreadable evidence clears candidate',()=>{for(const change of [{endInstabilityScore:90},{chartQuality:'poor'},{secondsToCandleClose:null},{timeframe:'M5'}])assert.equal(obs(12,obs(20).state,change).scan.candidateReady,false)});
+test('only final release window permits immediate signal',()=>{assert.equal(obs(12,obs(20).state,{},7000).scan.shouldSignalNow,true);assert.equal(obs(12,obs(20).state,{},1000).scan.shouldSignalNow,false)});
