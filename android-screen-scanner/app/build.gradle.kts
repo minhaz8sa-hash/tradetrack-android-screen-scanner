@@ -16,7 +16,7 @@ android {
         val ttEngineEndpoint = providers.gradleProperty("TT_ENGINE_ENDPOINT")
             .orElse("")
             .get()
-        buildConfigField("String", "TT_ENGINE_ENDPOINT", "\\\"${ttEngineEndpoint}\\\"")
+        buildConfigField("String", "TT_ENGINE_ENDPOINT", "\"${ttEngineEndpoint}\"")
     }
 
     buildFeatures {
