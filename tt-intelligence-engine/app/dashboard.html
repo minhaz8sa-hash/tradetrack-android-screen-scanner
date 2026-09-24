@@ -33,6 +33,10 @@
   <div class="card">
     <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
       <div style="flex:1;min-width:200px">
+        <label>Client token (only if server auth is enabled)</label>
+        <input id="clientToken" type="password" placeholder="TT client token" />
+      </div>
+      <div style="flex:1;min-width:200px">
         <label>Stats pair filter (optional)</label>
         <input id="statsPair" placeholder="EUR/JPY" />
       </div>
@@ -80,9 +84,15 @@
 <script>
 const j = (id) => document.getElementById(id);
 function esc(v){ return String(v ?? ""); }
+function authHeaders(){
+  const token=j("clientToken").value.trim();
+  return token ? {"X-TT-Client": token} : {};
+}
+j("clientToken").value=localStorage.getItem("ttClientToken")||"";
+j("clientToken").addEventListener("change",()=>localStorage.setItem("ttClientToken",j("clientToken").value.trim()));
 async function loadStats(){
   const pair=j("statsPair").value.trim();
-  const r=await fetch("/v1/learning/stats"+(pair?"?pair="+encodeURIComponent(pair):""));
+  const r=await fetch("/v1/learning/stats"+(pair?"?pair="+encodeURIComponent(pair):""),{headers:authHeaders()});
   const d=await r.json();
   const fields=[
     ["analyses","Analyses"],["unique_patterns","Unique patterns"],["labelled_outcomes","Labelled"],
@@ -93,7 +103,7 @@ async function loadStats(){
 j("trainForm").addEventListener("submit",async e=>{
   e.preventDefault(); const out=j("trainResult"); out.textContent="Analyzing + saving...";
   try{
-    const r=await fetch("/v1/train-snapshot",{method:"POST",body:new FormData(e.target)});
+    const r=await fetch("/v1/train-snapshot",{method:"POST",headers:authHeaders(),body:new FormData(e.target)});
     const d=await r.json(); out.textContent=JSON.stringify(d,null,2); loadStats();
   }catch(err){out.textContent=String(err)}
 });
@@ -104,7 +114,7 @@ j("psychForm").addEventListener("submit",async e=>{
   const body={pair:f.get("pair"),timeframe:"1M",market_type:f.get("market_type"),structure:f.get("structure")||null,psychology:base,notes:f.get("notes")||"",tags:["dashboard"]};
   const out=j("psychResult"); out.textContent="Saving...";
   try{
-    const r=await fetch("/v1/manual-observation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const r=await fetch("/v1/manual-observation",{method:"POST",headers:{"Content-Type":"application/json",...authHeaders()},body:JSON.stringify(body)});
     const d=await r.json(); out.textContent=JSON.stringify(d,null,2); loadStats();
   }catch(err){out.textContent=String(err)}
 });
