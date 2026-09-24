@@ -10,6 +10,7 @@ from .models import (
     ManualPsychologyInput,
     OutcomeInput,
     OutcomeResponse,
+    PsychologyState,
     TrainingExampleInput,
 )
 from .openai_analyzer import OpenAIChartAnalyzer
@@ -85,6 +86,69 @@ def manual_observation(item: ManualPsychologyInput) -> dict:
     payload = item.model_dump(mode="json")
     row_id = storage.save_manual_observation(payload)
     return {"saved": True, "observation_id": row_id}
+
+
+@app.post("/v1/train-snapshot")
+async def train_snapshot(
+    frame: UploadFile = File(...),
+    frame2: UploadFile | None = File(None),
+    frame3: UploadFile | None = File(None),
+    actual_direction: str = Form(...),
+    pair: str | None = Form(None),
+    timeframe: str = Form("1M"),
+    market_type: str = Form("UNKNOWN"),
+    notes: str = Form(""),
+    psychology_json: str | None = Form(None),
+    captured_at: str | None = Form(None),
+):
+    if actual_direction not in {"UP", "DOWN", "DOJI"}:
+        raise HTTPException(400, "actual_direction must be UP, DOWN, or DOJI")
+    if market_type not in {"REAL", "OTC", "UNKNOWN"}:
+        raise HTTPException(400, "market_type must be REAL, OTC, or UNKNOWN")
+
+    frames: list[bytes] = []
+    for item in [frame, frame2, frame3]:
+        if item is None:
+            continue
+        blob = await item.read()
+        if blob:
+            frames.append(blob)
+    if not frames:
+        raise HTTPException(400, "at least one snapshot is required")
+
+    try:
+        features = chart_analyzer.extract(
+            frames,
+            pair_hint=pair,
+            timeframe=timeframe,
+            market_type=market_type,
+            analysis_mode="full",
+        )
+        psychology_override = (
+            PsychologyState.model_validate_json(psychology_json)
+            if psychology_json
+            else None
+        )
+        dt = datetime.fromisoformat(captured_at.replace("Z", "+00:00")) if captured_at else datetime.now(timezone.utc)
+        analysis = engine.analyze_features(
+            features,
+            session_id=None,
+            analysis_mode="full",
+            captured_at=dt,
+            psychology_override=psychology_override,
+        )
+        outcome = storage.record_outcome(
+            analysis.analysis_id,
+            actual_direction,
+            notes,
+        )
+        return {
+            "saved": True,
+            "analysis": analysis.model_dump(mode="json"),
+            "outcome": outcome,
+        }
+    except Exception as exc:
+        raise HTTPException(502, f"training_snapshot_failed: {exc}") from exc
 
 
 @app.post("/v1/training-examples")
