@@ -1,0 +1,92 @@
+{
+  "dataset_version": "1.0",
+  "name": "TT SCAN CK Analysis Profile",
+  "created_from": "Recent ChatGPT CK forex-analysis workflow, Sep 21-24 2026",
+  "target": "NEXT 1-minute candle",
+  "supported_pairs_observed": [
+    "EUR/JPY",
+    "EUR/GBP",
+    "EUR/USD",
+    "CAD/JPY",
+    "GBP/JPY",
+    "AUD/JPY"
+  ],
+  "active_chart_rule": {
+    "named_pair_plus_ck": "Switch active chart to the named pair and analyze it.",
+    "plain_ck": "Continue analyzing the currently active pair."
+  },
+  "output_contract": {
+    "preferred_short_form": [
+      "pair",
+      "next_1m_direction",
+      "price_level_or_trigger",
+      "confirmation_score"
+    ],
+    "expanded_form": [
+      "pair",
+      "current_price",
+      "support",
+      "resistance",
+      "trend",
+      "pattern",
+      "important_breakout_or_reversal_info",
+      "up_score",
+      "down_score",
+      "confirmation",
+      "final"
+    ],
+    "final_values": [
+      "UP",
+      "DOWN",
+      "NO TRADE"
+    ],
+    "note": "Scores are technical setup/confirmation scores, not guaranteed win probabilities."
+  },
+  "required_checks": [
+    "1M current structure",
+    "5M context/structure when available",
+    "recent candle sequence",
+    "HH/HL/LH/LL market structure",
+    "support and resistance",
+    "previous high and previous low",
+    "clean breakout plus hold",
+    "breakout retest",
+    "failed breakout plus re-entry",
+    "rejection/reversal zones",
+    "gap/FVG/imbalance and gap-fill risk",
+    "momentum and continuation pressure",
+    "overextension/exhaustion",
+    "late-candle instability",
+    "support/resistance chase risk",
+    "spread/market quality when available"
+  ],
+  "no_trade_conditions": [
+    "signals are mixed or conflicting",
+    "clean break and hold is absent",
+    "price is too close to support or resistance for the proposed direction",
+    "fake-break risk is elevated",
+    "market is choppy/unclear",
+    "move is overextended/exhausted",
+    "late candle becomes unstable",
+    "fresh confirmation is missing",
+    "setup requires chasing directly into support/resistance"
+  ],
+  "confirmation_rule": "Near support/resistance, do not signal from score alone; require clean break plus hold/retest or an equally strong structural confirmation.",
+  "timing_intent": "Analyze the NEXT 1M candle; avoid forcing a trade simply to reach a trade count.",
+  "example_levels_from_prior_checks": [
+    {
+      "pair": "EUR/JPY",
+      "context": "Sep 21 2026 example",
+      "up_trigger": ">180.497-180.500 with clean break/hold",
+      "down_trigger": "<180.478 with clean break/hold",
+      "middle_zone": "NO TRADE"
+    },
+    {
+      "pair": "EUR/USD",
+      "context": "Sep 22 2026 example",
+      "direction": "DOWN",
+      "confirmation_score": 69,
+      "trigger": "below 1.14549"
+    }
+  ]
+}
