@@ -7,6 +7,7 @@ services:
     environment:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-5.6-luna}
+      TT_CLIENT_TOKEN: ${TT_CLIENT_TOKEN:-}
       TT_DB_PATH: /app/data/tt_intelligence.db
       TT_MIN_PATTERN_SIMILARITY: ${TT_MIN_PATTERN_SIMILARITY:-0.82}
       TT_MIN_DIRECTION_EDGE: ${TT_MIN_DIRECTION_EDGE:-0.15}
