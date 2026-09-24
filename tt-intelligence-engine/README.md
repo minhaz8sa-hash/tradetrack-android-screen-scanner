@@ -60,6 +60,13 @@ Returns:
 - decision: CANDIDATE / LOCKED / NO_TRADE
 - target next-candle open time when the chart timer can be read
 
+### POST /v1/training-examples
+
+Use this for curated historical/CK examples. Supply normalized chart features,
+an optional human-reviewed psychology state, and the actual next-candle direction.
+The engine stores the same pattern vector used by live scans and immediately labels
+the outcome, so it can participate in future similar-pattern retrieval.
+
 ### POST /v1/outcomes
 
 ```json
