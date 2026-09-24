@@ -54,6 +54,7 @@ public class CaptureService extends Service {
     private String scanSessionId = null;
     private int scanAttempt = 0;
     private long estimatedCloseEpochMs = 0L;
+    private long scanStartedEpochMs = 0L;
     private boolean heldCandidateReady = false;
     private String heldDirection = "";
     private int heldUp = 50;
@@ -233,6 +234,7 @@ public class CaptureService extends Service {
         scanAttempt = 0;
         scanSessionId = UUID.randomUUID().toString();
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = System.currentTimeMillis();
         heldCandidateReady = false;
         heldDirection = "";
         heldUp = 50;
@@ -254,6 +256,7 @@ public class CaptureService extends Service {
         scanSessionId = null;
         scanAttempt = 0;
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = 0L;
         heldCandidateReady = false;
         heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
@@ -345,6 +348,10 @@ public class CaptureService extends Service {
 
     private void captureAndAnalyze() {
         if (!armed || analyzing || imageReader == null || bubble == null) return;
+        if (scanStartedEpochMs > 0L && System.currentTimeMillis() - scanStartedEpochMs > 75000L) {
+            finishNoTrade("Scan timeout: exact target candle timing was not confirmed.");
+            return;
+        }
 
         analyzing = true;
         scanAttempt++;
