@@ -170,12 +170,13 @@ class TTIntelligenceEngine:
         session_id: str | None,
         analysis_mode: str,
         captured_at: datetime | None = None,
+        psychology_override: PsychologyState | None = None,
     ) -> AnalysisResponse:
         captured_at = captured_at or datetime.now(timezone.utc)
         if captured_at.tzinfo is None:
             captured_at = captured_at.replace(tzinfo=timezone.utc)
 
-        psychology = self.psychology.build(features)
+        psychology = psychology_override or self.psychology.build(features)
         vector = self.patterns.vectorize(features, psychology)
         pattern_key = self.patterns.key(features, psychology, vector)
         similar = self.storage.find_similar(
