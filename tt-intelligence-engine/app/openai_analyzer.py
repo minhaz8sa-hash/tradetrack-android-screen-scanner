@@ -116,3 +116,68 @@ class OpenAIChartAnalyzer:
         if market_type != "UNKNOWN":
             payload["market_type"] = market_type
         return SnapshotFeatures.model_validate(payload)
+
+
+OUTCOME_PROMPT = """
+You are resolving the outcome of a previously targeted 1-minute candle from a
+chart screenshot captured immediately after that candle closed.
+
+Identify the most recently CLOSED candle immediately to the left of the current
+running candle. Return JSON only:
+{
+  "actual_direction": "UP|DOWN|DOJI",
+  "confidence": 0.0,
+  "reason": "short observable reason"
+}
+
+Rules:
+- UP: close is visibly above open.
+- DOWN: close is visibly below open.
+- DOJI: open/close are effectively indistinguishable or direction is not reliable.
+- Do not infer a trading signal.
+- If the latest closed candle cannot be identified confidently, use DOJI with
+  confidence below 0.70.
+""".strip()
+
+
+class OpenAIOutcomeResolver:
+    def __init__(self, client: OpenAI | None = None):
+        self.client = client
+        self.model = os.getenv("OPENAI_VISION_MODEL", "gpt-5.6-luna")
+
+    def resolve(self, frame: bytes, *, pair_hint: str | None = None) -> dict:
+        client = self.client or OpenAI()
+        response = client.responses.create(
+            model=self.model,
+            input=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": OUTCOME_PROMPT + "\nPair hint: " + str(pair_hint or "UNKNOWN"),
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": _data_url(frame),
+                        },
+                    ],
+                }
+            ],
+        )
+        raw = response.output_text.strip()
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+            if raw.startswith("json"):
+                raw = raw[4:].strip()
+        payload = json.loads(raw)
+        direction = str(payload.get("actual_direction", "DOJI")).upper()
+        if direction not in {"UP", "DOWN", "DOJI"}:
+            direction = "DOJI"
+        confidence = float(payload.get("confidence", 0.0))
+        confidence = max(0.0, min(1.0, confidence))
+        return {
+            "actual_direction": direction,
+            "confidence": confidence,
+            "reason": str(payload.get("reason", "")),
+        }
