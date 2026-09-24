@@ -81,6 +81,99 @@ async def analyze(
         raise HTTPException(502, f"analysis_failed: {exc}") from exc
 
 
+@app.post("/v1/mobile-scan")
+async def mobile_scan(
+    frame: UploadFile = File(...),
+    frame2: UploadFile | None = File(None),
+    frame3: UploadFile | None = File(None),
+    capturedAt: str | None = Form(None),
+    scanSessionId: str | None = Form(None),
+    analysisMode: str = Form("full"),
+    pair: str | None = Form(None),
+    timeframe: str = Form("1M"),
+    marketType: str = Form("UNKNOWN"),
+):
+    if analysisMode not in {"full", "verify"}:
+        raise HTTPException(400, "analysisMode must be full or verify")
+    if marketType not in {"REAL", "OTC", "UNKNOWN"}:
+        raise HTTPException(400, "marketType must be REAL, OTC, or UNKNOWN")
+
+    frames: list[bytes] = []
+    for item in [frame, frame2, frame3]:
+        if item is None:
+            continue
+        blob = await item.read()
+        if blob:
+            frames.append(blob)
+    if not frames:
+        raise HTTPException(400, "at least one snapshot is required")
+
+    try:
+        features = chart_analyzer.extract(
+            frames,
+            pair_hint=pair,
+            timeframe=timeframe,
+            market_type=marketType,
+            analysis_mode=analysisMode,
+        )
+        dt = datetime.fromisoformat(capturedAt.replace("Z", "+00:00")) if capturedAt else datetime.now(timezone.utc)
+        analysis = engine.analyze_features(
+            features,
+            session_id=scanSessionId,
+            analysis_mode=analysisMode,
+            captured_at=dt,
+        )
+        decision = analysis.decision
+        psychology = analysis.psychology
+
+        if decision.state == "NO_TRADE":
+            bias_state = "NO_TRADE"
+        elif features.instability_score >= 0.62:
+            bias_state = "UNSTABLE"
+        else:
+            bias_state = "SCANNING"
+
+        candidate_ready = (
+            decision.state == "LOCKED"
+            and decision.direction in {"UP", "DOWN"}
+        )
+        estimated_close = (
+            decision.target_candle_open_at.isoformat().replace("+00:00", "Z")
+            if decision.target_candle_open_at
+            else ""
+        )
+        seconds_to_close = (
+            features.seconds_to_close if features.seconds_to_close is not None else -1
+        )
+        rationale = "; ".join(decision.rationale[:5])
+        if decision.risk_vetoes:
+            rationale += ("; " if rationale else "") + "veto=" + " | ".join(decision.risk_vetoes)
+
+        return {
+            "success": True,
+            "scan": {
+                "analysisId": analysis.analysis_id,
+                "patternKey": analysis.pattern_key,
+                "upConfirmation": decision.up_score,
+                "downConfirmation": decision.down_score,
+                "biasState": bias_state,
+                "secondsToCandleClose": seconds_to_close,
+                "candidateReady": candidate_ready,
+                "candidateDirection": decision.direction,
+                "endInstabilityScore": round(features.instability_score * 100),
+                "estimatedCandleCloseAt": estimated_close,
+                "asset": features.pair,
+                "payout": 0,
+                "rationale": rationale,
+                "psychology": psychology.model_dump(mode="json"),
+                "similarPatternCount": len(analysis.similar_patterns),
+                "decisionState": decision.state,
+            },
+        }
+    except Exception as exc:
+        raise HTTPException(502, f"mobile_scan_failed: {exc}") from exc
+
+
 @app.post("/v1/manual-observation")
 def manual_observation(item: ManualPsychologyInput) -> dict:
     payload = item.model_dump(mode="json")
