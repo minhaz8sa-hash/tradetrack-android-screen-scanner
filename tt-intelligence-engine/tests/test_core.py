@@ -86,3 +86,17 @@ def test_verified_snapshot_can_lock_next_candle(tmp_path):
     assert result.decision.state == "LOCKED"
     assert result.decision.direction == "UP"
     assert result.decision.target_candle_open_at is not None
+
+
+def test_reversing_candle_sequence_changes_pattern_similarity():
+    f1 = sample_features()
+    p1 = PsychologyBuilder().build(f1)
+    encoder = PatternEncoder()
+    v1 = encoder.vectorize(f1, p1)
+
+    f2 = f1.model_copy(deep=True)
+    f2.candles = list(reversed(f2.candles))
+    p2 = PsychologyBuilder().build(f2)
+    v2 = encoder.vectorize(f2, p2)
+
+    assert cosine_similarity(v1, v2) < 0.999
