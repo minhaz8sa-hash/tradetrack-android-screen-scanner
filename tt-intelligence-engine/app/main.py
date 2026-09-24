@@ -116,6 +116,11 @@ def record_outcome(item: OutcomeInput):
         raise HTTPException(404, "analysis_id not found")
 
 
+@app.get("/v1/learning/stats")
+def learning_stats(pair: str | None = None) -> dict:
+    return storage.learning_stats(pair)
+
+
 @app.get("/v1/analyses/{analysis_id}")
 def get_analysis(analysis_id: str):
     item = storage.get_analysis(analysis_id)
