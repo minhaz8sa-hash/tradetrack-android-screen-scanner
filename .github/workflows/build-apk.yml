@@ -2,12 +2,20 @@ name: Build Android Scanner APK
 
 on:
   workflow_dispatch:
+    inputs:
+      engine_endpoint:
+        description: "TT Engine mobile-scan URL, e.g. https://engine.example.com/v1/mobile-scan"
+        required: false
+        type: string
   push:
+    branches: [tt-scan-v2-engine]
     paths:
       - "android-screen-scanner/**"
+      - ".github/workflows/build-apk.yml"
   pull_request:
     paths:
       - "android-screen-scanner/**"
+      - ".github/workflows/build-apk.yml"
 
 jobs:
   build:
@@ -34,11 +42,18 @@ jobs:
           gradle-version: "8.9"
 
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        shell: bash
+        run: |
+          ENDPOINT="${{ inputs.engine_endpoint }}"
+          if [ -z "$ENDPOINT" ]; then
+            ENDPOINT="${{ vars.TT_ENGINE_ENDPOINT }}"
+          fi
+          echo "Building TT SCAN v2 (endpoint configured: $([ -n "$ENDPOINT" ] && echo yes || echo no))"
+          gradle :app:assembleDebug --stacktrace -PTT_ENGINE_ENDPOINT="$ENDPOINT"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TradeTrack-Android-Screen-Scanner
+          name: TradeTrack-TT-SCAN-v2
           path: android-screen-scanner/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
