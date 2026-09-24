@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import hmac
+import os
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from .engine import TTIntelligenceEngine
 from .models import (
@@ -29,6 +31,21 @@ storage = Storage()
 engine = TTIntelligenceEngine(storage)
 chart_analyzer = OpenAIChartAnalyzer()
 outcome_resolver = OpenAIOutcomeResolver()
+
+
+@app.middleware("http")
+async def client_auth(request: Request, call_next):
+    expected = os.getenv("TT_CLIENT_TOKEN", "").strip()
+    if not expected:
+        return await call_next(request)
+
+    if request.url.path in {"/health", "/dashboard"} and request.method == "GET":
+        return await call_next(request)
+
+    supplied = request.headers.get("X-TT-Client", "")
+    if not supplied or not hmac.compare_digest(supplied, expected):
+        return JSONResponse({"detail": "unauthorized TT client"}, status_code=401)
+    return await call_next(request)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
