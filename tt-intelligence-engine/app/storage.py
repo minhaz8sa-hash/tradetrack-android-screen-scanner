@@ -224,3 +224,71 @@ class Storage:
 
         scored.sort(key=lambda x: x.similarity, reverse=True)
         return scored[:limit]
+
+
+    def learning_stats(self, pair: str | None = None) -> dict[str, int]:
+        where = ""
+        params: tuple = ()
+        if pair:
+            where = " WHERE pair = ?"
+            params = (pair,)
+
+        with self._connect() as conn:
+            analyses = conn.execute(
+                f"SELECT COUNT(*) AS n FROM analyses{where}", params
+            ).fetchone()["n"]
+
+            patterns = conn.execute(
+                f"SELECT COUNT(DISTINCT pattern_key) AS n FROM analyses{where}", params
+            ).fetchone()["n"]
+
+            if pair:
+                labelled = conn.execute(
+                    """
+                    SELECT COUNT(*) AS n
+                    FROM outcomes o
+                    JOIN analyses a ON a.id = o.analysis_id
+                    WHERE a.pair = ? AND o.result IN ('WIN','LOSS','DRAW')
+                    """,
+                    (pair,),
+                ).fetchone()["n"]
+                rows = conn.execute(
+                    """
+                    SELECT o.result, COUNT(*) AS n
+                    FROM outcomes o
+                    JOIN analyses a ON a.id = o.analysis_id
+                    WHERE a.pair = ? AND o.result IN ('WIN','LOSS','DRAW')
+                    GROUP BY o.result
+                    """,
+                    (pair,),
+                ).fetchall()
+                manual = conn.execute(
+                    "SELECT COUNT(*) AS n FROM manual_observations WHERE pair = ?",
+                    (pair,),
+                ).fetchone()["n"]
+            else:
+                labelled = conn.execute(
+                    "SELECT COUNT(*) AS n FROM outcomes WHERE result IN ('WIN','LOSS','DRAW')"
+                ).fetchone()["n"]
+                rows = conn.execute(
+                    """
+                    SELECT result, COUNT(*) AS n
+                    FROM outcomes
+                    WHERE result IN ('WIN','LOSS','DRAW')
+                    GROUP BY result
+                    """
+                ).fetchall()
+                manual = conn.execute(
+                    "SELECT COUNT(*) AS n FROM manual_observations"
+                ).fetchone()["n"]
+
+        result_counts = {row["result"]: row["n"] for row in rows}
+        return {
+            "analyses": int(analyses),
+            "unique_patterns": int(patterns),
+            "labelled_outcomes": int(labelled),
+            "wins": int(result_counts.get("WIN", 0)),
+            "losses": int(result_counts.get("LOSS", 0)),
+            "draws": int(result_counts.get("DRAW", 0)),
+            "manual_psychology_observations": int(manual),
+        }
