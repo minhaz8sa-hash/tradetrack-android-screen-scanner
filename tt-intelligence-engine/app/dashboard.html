@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TT Intelligence Learning Console</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin:0; background:#07110e; color:#e8fff7; }
+    main { max-width:980px; margin:0 auto; padding:24px; }
+    h1 { margin:0 0 6px; font-size:28px; }
+    .sub { color:#8fb4a8; margin-bottom:22px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; }
+    .card { background:#0d1c17; border:1px solid #1d4638; border-radius:16px; padding:18px; }
+    label { display:block; font-size:12px; color:#9bc9ba; margin:11px 0 5px; }
+    input,select,textarea,button { width:100%; box-sizing:border-box; border-radius:10px; border:1px solid #2b5a49; background:#0a1512; color:#ecfff8; padding:10px 11px; }
+    textarea { min-height:96px; resize:vertical; }
+    button { margin-top:14px; background:#0c5d44; border-color:#1f8b68; font-weight:700; cursor:pointer; }
+    button:hover { background:#107255; }
+    pre { white-space:pre-wrap; word-break:break-word; color:#b8e8d8; background:#07100d; padding:12px; border-radius:10px; max-height:260px; overflow:auto; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .stat { background:#08130f; border:1px solid #183d31; border-radius:10px; padding:10px; }
+    .stat b { display:block; font-size:20px; }
+    .stat span { color:#7fa99b; font-size:11px; }
+    .ok { color:#6ee7b7; } .bad { color:#fca5a5; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>TT Intelligence Engine</h1>
+  <div class="sub">Market structure + psychology + repeated-pattern learning console.</div>
+
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label>Stats pair filter (optional)</label>
+        <input id="statsPair" placeholder="EUR/JPY" />
+      </div>
+      <div style="width:160px"><button onclick="loadStats()">Refresh stats</button></div>
+    </div>
+    <div id="stats" class="stats" style="margin-top:14px"></div>
+  </div>
+
+  <div class="grid" style="margin-top:14px">
+    <section class="card">
+      <h2>Train from snapshot</h2>
+      <p class="sub">Upload a historical chart screenshot and label what the NEXT 1M candle actually did.</p>
+      <form id="trainForm">
+        <label>Chart screenshot</label><input name="frame" type="file" accept="image/*" required />
+        <label>Pair</label><input name="pair" placeholder="EUR/JPY" />
+        <label>Market type</label>
+        <select name="market_type"><option>REAL</option><option>OTC</option><option>UNKNOWN</option></select>
+        <label>Actual NEXT candle</label>
+        <select name="actual_direction"><option>UP</option><option>DOWN</option><option>DOJI</option></select>
+        <label>Notes</label><textarea name="notes" placeholder="Breakout + retest; next candle closed bullish..."></textarea>
+        <button>Save labelled pattern</button>
+      </form>
+      <pre id="trainResult">Ready.</pre>
+    </section>
+
+    <section class="card">
+      <h2>Manual psychology observation</h2>
+      <p class="sub">Human-reviewed market behavior note. This stays separate from automatically inferred psychology.</p>
+      <form id="psychForm">
+        <label>Pair</label><input name="pair" value="EUR/JPY" required />
+        <label>Market type</label>
+        <select name="market_type"><option>REAL</option><option>OTC</option><option>UNKNOWN</option></select>
+        <label>Structure</label><input name="structure" placeholder="HH_HL / LH_LL / breakout retest..." />
+        <label>Buyer aggression (0–1)</label><input name="buyer_aggression" type="number" min="0" max="1" step="0.05" value="0.5" />
+        <label>Seller aggression (0–1)</label><input name="seller_aggression" type="number" min="0" max="1" step="0.05" value="0.5" />
+        <label>Hesitation (0–1)</label><input name="hesitation" type="number" min="0" max="1" step="0.05" value="0.3" />
+        <label>Trap risk (0–1)</label><input name="trap_risk" type="number" min="0" max="1" step="0.05" value="0.2" />
+        <label>Notes</label><textarea name="notes" placeholder="Buyers absorbed sell pressure near support..."></textarea>
+        <button>Save psychology note</button>
+      </form>
+      <pre id="psychResult">Ready.</pre>
+    </section>
+  </div>
+</main>
+<script>
+const j = (id) => document.getElementById(id);
+function esc(v){ return String(v ?? ""); }
+async function loadStats(){
+  const pair=j("statsPair").value.trim();
+  const r=await fetch("/v1/learning/stats"+(pair?"?pair="+encodeURIComponent(pair):""));
+  const d=await r.json();
+  const fields=[
+    ["analyses","Analyses"],["unique_patterns","Unique patterns"],["labelled_outcomes","Labelled"],
+    ["wins","Wins"],["losses","Losses"],["draws","Draws"],["manual_psychology_observations","Manual psych"]
+  ];
+  j("stats").innerHTML=fields.map(([k,l])=>'<div class="stat"><b>'+esc(d[k])+'</b><span>'+l+'</span></div>').join("");
+}
+j("trainForm").addEventListener("submit",async e=>{
+  e.preventDefault(); const out=j("trainResult"); out.textContent="Analyzing + saving...";
+  try{
+    const r=await fetch("/v1/train-snapshot",{method:"POST",body:new FormData(e.target)});
+    const d=await r.json(); out.textContent=JSON.stringify(d,null,2); loadStats();
+  }catch(err){out.textContent=String(err)}
+});
+j("psychForm").addEventListener("submit",async e=>{
+  e.preventDefault(); const f=new FormData(e.target);
+  const base={buyer_aggression:0,seller_aggression:0,rejection_up:0,rejection_down:0,absorption_buy:0,absorption_sell:0,hesitation:0,breakout_intent_up:0,breakout_intent_down:0,exhaustion_up:0,exhaustion_down:0,trap_risk:0,summary:"manual observation"};
+  for(const k of ["buyer_aggression","seller_aggression","hesitation","trap_risk"]) base[k]=Number(f.get(k)||0);
+  const body={pair:f.get("pair"),timeframe:"1M",market_type:f.get("market_type"),structure:f.get("structure")||null,psychology:base,notes:f.get("notes")||"",tags:["dashboard"]};
+  const out=j("psychResult"); out.textContent="Saving...";
+  try{
+    const r=await fetch("/v1/manual-observation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const d=await r.json(); out.textContent=JSON.stringify(d,null,2); loadStats();
+  }catch(err){out.textContent=String(err)}
+});
+loadStats();
+</script>
+</body>
+</html>
