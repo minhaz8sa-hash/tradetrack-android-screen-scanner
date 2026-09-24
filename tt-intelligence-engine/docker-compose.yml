@@ -1,0 +1,17 @@
+services:
+  tt-engine:
+    image: ghcr.io/minhaz8sa-hash/tt-intelligence-engine:v2
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-5.6-luna}
+      TT_DB_PATH: /app/data/tt_intelligence.db
+      TT_MIN_PATTERN_SIMILARITY: ${TT_MIN_PATTERN_SIMILARITY:-0.82}
+      TT_MIN_DIRECTION_EDGE: ${TT_MIN_DIRECTION_EDGE:-0.15}
+    volumes:
+      - tt-engine-data:/app/data
+
+volumes:
+  tt-engine-data:
