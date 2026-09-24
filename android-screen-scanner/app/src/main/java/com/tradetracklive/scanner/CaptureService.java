@@ -37,9 +37,7 @@ public class CaptureService extends Service {
     public static final String EXTRA_RESULT_DATA = "resultData";
 
     private static final String CHANNEL_ID = "ttl_screen_scanner";
-    private static final String ENDPOINT =
-            "https://base44.app/api/apps/6a1d6d69aab915d09b7b082d/functions/analyzeMobileScreenCapture";
-    private static final String APP_ID = "6a1d6d69aab915d09b7b082d";
+    private static final String ENDPOINT = BuildConfig.TT_ENGINE_ENDPOINT;
 
     private WindowManager windowManager;
     private TextView bubble;
@@ -221,6 +219,12 @@ public class CaptureService extends Service {
 
     private void armScanner() {
         if (imageReader == null || bubble == null) return;
+        if (ENDPOINT == null || ENDPOINT.trim().isEmpty()) {
+            bubble.setVisibility(View.VISIBLE);
+            bubble.setText("ENGINE URL\nMISSING");
+            bubble.setContentDescription("TT Intelligence Engine endpoint is not configured in this APK build.");
+            return;
+        }
         armed = true;
         scanAttempt = 0;
         scanSessionId = UUID.randomUUID().toString();
@@ -520,7 +524,7 @@ public class CaptureService extends Service {
         conn.setReadTimeout(30000);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
-        conn.setRequestProperty("X-App-Id", APP_ID);
+        conn.setRequestProperty("Accept", "application/json");
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
@@ -552,7 +556,10 @@ public class CaptureService extends Service {
         String body = readAll(stream);
         JSONObject json = new JSONObject(body);
         if (code < 200 || code >= 300 || !json.optBoolean("success", false)) {
-            throw new IOException(json.optString("error", "HTTP " + code));
+            String detail = json.optString("detail", "");
+            String error = json.optString("error", "");
+            String message = !detail.isEmpty() ? detail : (!error.isEmpty() ? error : "HTTP " + code);
+            throw new IOException(message);
         }
         return json;
     }
