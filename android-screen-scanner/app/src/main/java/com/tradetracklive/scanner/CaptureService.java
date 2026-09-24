@@ -24,6 +24,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,6 +61,7 @@ public class CaptureService extends Service {
     private double heldSourceSeconds = -1;
     private String heldAsset = "—";
     private int heldPayout = 0;
+    private String heldAnalysisId = "";
     private boolean stopping = false;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -237,6 +240,7 @@ public class CaptureService extends Service {
         heldSourceSeconds = -1;
         heldAsset = "—";
         heldPayout = 0;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
         mainHandler.post(finalWindowWatcher);
         bubble.setText("ARMED\nSCANNING");
@@ -250,6 +254,7 @@ public class CaptureService extends Service {
         scanAttempt = 0;
         estimatedCloseEpochMs = 0L;
         heldCandidateReady = false;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
         if (bubble != null) {
             bubble.setVisibility(View.VISIBLE);
@@ -261,13 +266,22 @@ public class CaptureService extends Service {
     private void releaseHeldSignal() {
         if (!armed || bubble == null || !heldCandidateReady) return;
 
-        String arrow = "UP".equals(heldDirection) ? "↑" : "↓";
+        final String direction = heldDirection;
+        final String analysisId = heldAnalysisId;
+        final String asset = heldAsset;
+        final int up = heldUp;
+        final int down = heldDown;
+        final int instability = heldInstability;
+        final long targetOpenMs = estimatedCloseEpochMs;
+        final String arrow = "UP".equals(direction) ? "↑" : "↓";
+        final String targetTime = formatTargetTime(targetOpenMs);
+
         bubble.setVisibility(View.VISIBLE);
-        bubble.setText("NEXT " + arrow + " " + heldDirection + "\n↑" + heldUp + "%  ↓" + heldDown + "%");
+        bubble.setText("NEXT " + targetTime + "\n" + arrow + " " + direction + " LOCKED");
         bubble.setContentDescription(
-                heldAsset + " " + heldPayout + "%. Signal target NEXT candle. " +
-                        heldDirection + ". UP " + heldUp + "%, DOWN " + heldDown +
-                        "%. Final instability " + heldInstability + "."
+                asset + ". Locked signal for the next candle opening at " + targetTime + ". " +
+                        direction + ". UP " + up + "%, DOWN " + down +
+                        "%. Final instability " + instability + "."
         );
 
         armed = false;
@@ -276,9 +290,38 @@ public class CaptureService extends Service {
         estimatedCloseEpochMs = 0L;
         mainHandler.removeCallbacks(finalWindowWatcher);
 
+        long untilOpen = Math.max(0L, targetOpenMs - System.currentTimeMillis());
+        mainHandler.postDelayed(() -> {
+            if (bubble == null || armed) return;
+            bubble.setVisibility(View.VISIBLE);
+            bubble.setText("ENTER NEXT " + arrow + "\n" + direction + " • " + targetTime);
+            bubble.setContentDescription("Entry window for the " + targetTime + " target candle. " + direction + ".");
+        }, untilOpen);
+
+        mainHandler.postDelayed(() -> {
+            if (bubble == null || armed) return;
+            bubble.setText("SIGNAL EXPIRED\nDO NOT CHASE");
+            bubble.setContentDescription("The entry window for the target candle has expired.");
+        }, untilOpen + 3000L);
+
         mainHandler.postDelayed(() -> {
             if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
-        }, 12000);
+        }, untilOpen + 9000L);
+
+        if (analysisId != null && !analysisId.isEmpty() && targetOpenMs > 0L) {
+            scheduleOutcomeCapture(analysisId, asset, targetOpenMs);
+        }
+    }
+
+    private String formatTargetTime(long epochMs) {
+        if (epochMs <= 0L) return "NEXT";
+        try {
+            return Instant.ofEpochMilli(epochMs)
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+        } catch (Exception ignored) {
+            return "NEXT";
+        }
     }
 
     private void finishNoTrade(String reason) {
@@ -367,6 +410,7 @@ public class CaptureService extends Service {
                 String asset = scan.optString("asset", "—");
                 int payout = (int) Math.round(scan.optDouble("payout", 0));
                 String rationale = scan.optString("rationale", "");
+                String analysisId = scan.optString("analysisId", "");
 
                 mainHandler.post(() -> {
                     if (bubble == null) return;
@@ -395,10 +439,12 @@ public class CaptureService extends Service {
                         heldSourceSeconds = sourceSeconds;
                         heldAsset = asset;
                         heldPayout = payout;
+                        heldAnalysisId = analysisId;
                     } else if (sourceSeconds >= 0 && sourceSeconds <= 15) {
                         // A later verification has priority. If it becomes unstable or loses confirmation,
                         // discard the older candidate rather than showing stale confidence at T-5.
                         heldCandidateReady = false;
+                        heldAnalysisId = "";
                     }
 
                     bubble.setVisibility(View.VISIBLE);
@@ -563,6 +609,78 @@ public class CaptureService extends Service {
         }
         return json;
     }
+
+    private void scheduleOutcomeCapture(String analysisId, String asset, long targetOpenMs) {
+        long captureAtMs = targetOpenMs + 62000L;
+        long delay = Math.max(0L, captureAtMs - System.currentTimeMillis());
+
+        mainHandler.postDelayed(() -> io.submit(() -> {
+            try {
+                if (imageReader == null) return;
+
+                mainHandler.post(() -> {
+                    if (bubble != null && !armed) bubble.setVisibility(View.INVISIBLE);
+                });
+                Thread.sleep(180);
+
+                Bitmap raw = acquireLatestBitmap();
+                if (raw == null) return;
+                Bitmap cropped = cropForAnalysis(raw);
+                Bitmap scaled = scaleForUpload(cropped, 720);
+
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                scaled.compress(Bitmap.CompressFormat.JPEG, 72, bos);
+
+                if (scaled != cropped) scaled.recycle();
+                if (cropped != raw) cropped.recycle();
+                raw.recycle();
+
+                postOutcomeSnapshot(bos.toByteArray(), analysisId, asset);
+            } catch (Exception ignored) {
+                // Learning feedback is best-effort and must never affect a live signal.
+            } finally {
+                mainHandler.post(() -> {
+                    if (bubble != null && !armed) bubble.setVisibility(View.VISIBLE);
+                });
+            }
+        }), delay);
+    }
+
+    private void postOutcomeSnapshot(byte[] frame, String analysisId, String asset) throws Exception {
+        String outcomeEndpoint = ENDPOINT.endsWith("/v1/mobile-scan")
+                ? ENDPOINT.substring(0, ENDPOINT.length() - "/v1/mobile-scan".length()) + "/v1/outcome-snapshot"
+                : ENDPOINT.replace("/mobile-scan", "/outcome-snapshot");
+
+        String boundary = "----TTLOutcome" + System.currentTimeMillis();
+        HttpURLConnection conn = (HttpURLConnection) new URL(outcomeEndpoint).openConnection();
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(30000);
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+        try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
+            writeField(out, boundary, "analysisId", analysisId);
+            writeField(out, boundary, "pair", asset == null ? "" : asset);
+
+            out.writeBytes("--" + boundary + "\r\n");
+            out.writeBytes("Content-Disposition: form-data; name=\"frame\"; filename=\"outcome.jpg\"\r\n");
+            out.writeBytes("Content-Type: image/jpeg\r\n\r\n");
+            out.write(frame);
+            out.writeBytes("\r\n");
+            out.writeBytes("--" + boundary + "--\r\n");
+            out.flush();
+        }
+
+        int code = conn.getResponseCode();
+        InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+        String body = readAll(stream);
+        if (code < 200 || code >= 300) {
+            throw new IOException("Outcome feedback HTTP " + code + ": " + body);
+        }
+    }
+
 
     private void writeField(DataOutputStream out, String boundary, String name, String value) throws IOException {
         out.writeBytes("--" + boundary + "\r\n");
