@@ -13,7 +13,7 @@ from .models import (
     PsychologyState,
     TrainingExampleInput,
 )
-from .openai_analyzer import OpenAIChartAnalyzer
+from .openai_analyzer import OpenAIChartAnalyzer, OpenAIOutcomeResolver
 from .storage import Storage
 
 
@@ -26,6 +26,7 @@ app = FastAPI(
 storage = Storage()
 engine = TTIntelligenceEngine(storage)
 chart_analyzer = OpenAIChartAnalyzer()
+outcome_resolver = OpenAIOutcomeResolver()
 
 
 @app.get("/health")
@@ -172,6 +173,49 @@ async def mobile_scan(
         }
     except Exception as exc:
         raise HTTPException(502, f"mobile_scan_failed: {exc}") from exc
+
+
+@app.post("/v1/outcome-snapshot")
+async def outcome_snapshot(
+    frame: UploadFile = File(...),
+    analysisId: str = Form(...),
+    pair: str | None = Form(None),
+):
+    blob = await frame.read()
+    if not blob:
+        raise HTTPException(400, "outcome snapshot is empty")
+    analysis = storage.get_analysis(analysisId)
+    if analysis is None:
+        raise HTTPException(404, "analysisId not found")
+
+    try:
+        resolved = outcome_resolver.resolve(
+            blob,
+            pair_hint=pair or analysis.get("pair"),
+        )
+        if resolved["confidence"] < 0.70:
+            return {
+                "saved": False,
+                "resolved": False,
+                "analysisId": analysisId,
+                **resolved,
+            }
+
+        result = storage.record_outcome(
+            analysisId,
+            resolved["actual_direction"],
+            "automatic outcome snapshot: " + resolved["reason"],
+        )
+        return {
+            "saved": True,
+            "resolved": True,
+            "analysisId": analysisId,
+            "confidence": resolved["confidence"],
+            "reason": resolved["reason"],
+            "outcome": result,
+        }
+    except Exception as exc:
+        raise HTTPException(502, f"outcome_snapshot_failed: {exc}") from exc
 
 
 @app.post("/v1/manual-observation")
