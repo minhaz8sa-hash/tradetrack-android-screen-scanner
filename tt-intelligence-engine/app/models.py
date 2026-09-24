@@ -73,6 +73,14 @@ class ManualPsychologyInput(BaseModel):
     tags: list[str] = Field(default_factory=list)
 
 
+class TrainingExampleInput(BaseModel):
+    features: SnapshotFeatures
+    psychology_override: Optional[PsychologyState] = None
+    actual_direction: Literal["UP", "DOWN", "DOJI"]
+    notes: str = ""
+    tags: list[str] = Field(default_factory=list)
+
+
 class SimilarPattern(BaseModel):
     analysis_id: str
     similarity: float
