@@ -292,6 +292,9 @@ public class CaptureService extends Service {
         analyzing = false;
         scanSessionId = null;
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = 0L;
+        heldCandidateReady = false;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
 
         long untilOpen = Math.max(0L, targetOpenMs - System.currentTimeMillis());
@@ -338,7 +341,9 @@ public class CaptureService extends Service {
         analyzing = false;
         scanSessionId = null;
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = 0L;
         heldCandidateReady = false;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
 
         mainHandler.postDelayed(() -> {
