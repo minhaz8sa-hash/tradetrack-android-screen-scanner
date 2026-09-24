@@ -65,7 +65,7 @@ def _data_url(data: bytes) -> str:
 
 class OpenAIChartAnalyzer:
     def __init__(self, client: OpenAI | None = None):
-        self.client = client or OpenAI()
+        self.client = client
         self.model = os.getenv("OPENAI_VISION_MODEL", "gpt-5.6-luna")
 
     def extract(
@@ -97,7 +97,8 @@ class OpenAIChartAnalyzer:
         for frame in frames:
             content.append({"type": "input_image", "image_url": _data_url(frame)})
 
-        response = self.client.responses.create(
+        client = self.client or OpenAI()
+        response = client.responses.create(
             model=self.model,
             input=[{"role": "user", "content": content}],
         )
