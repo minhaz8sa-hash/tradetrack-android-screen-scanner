@@ -67,6 +67,13 @@ Returns:
 - decision: CANDIDATE / LOCKED / NO_TRADE
 - target next-candle open time when the chart timer can be read
 
+### POST /v1/outcome-snapshot
+
+After a LOCKED target candle closes, the scanner can upload a fresh screenshot
+with the originating `analysisId`. The engine resolves the latest closed candle
+as UP/DOWN/DOJI and records the labelled outcome when visual confidence is at
+least 0.70. Low-confidence screenshots are not used for learning.
+
 ### POST /v1/train-snapshot
 
 Upload one to three historical chart screenshots plus `actual_direction=UP|DOWN|DOJI`.
