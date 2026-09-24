@@ -38,6 +38,13 @@ This is outcome-calibrated memory, not uncontrolled self-modifying model trainin
 
 ## API
 
+### POST /v1/mobile-scan
+
+Compatibility endpoint for the existing Android floating scanner. It accepts the
+legacy multipart field names (`capturedAt`, `scanSessionId`, `analysisMode`)
+and returns the old `{"success": true, "scan": ...}` envelope while using the
+new psychology/pattern-learning engine internally.
+
 ### POST /v1/analyze
 
 Multipart fields:
