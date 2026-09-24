@@ -40,6 +40,7 @@ public class CaptureService extends Service {
 
     private static final String CHANNEL_ID = "ttl_screen_scanner";
     private static final String ENDPOINT = BuildConfig.TT_ENGINE_ENDPOINT;
+    private static final String CLIENT_TOKEN = BuildConfig.TT_CLIENT_TOKEN;
 
     private WindowManager windowManager;
     private TextView bubble;
@@ -571,6 +572,9 @@ public class CaptureService extends Service {
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
         conn.setRequestProperty("Accept", "application/json");
+        if (CLIENT_TOKEN != null && !CLIENT_TOKEN.isEmpty()) {
+            conn.setRequestProperty("X-TT-Client", CLIENT_TOKEN);
+        }
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
@@ -658,6 +662,9 @@ public class CaptureService extends Service {
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
         conn.setRequestProperty("Accept", "application/json");
+        if (CLIENT_TOKEN != null && !CLIENT_TOKEN.isEmpty()) {
+            conn.setRequestProperty("X-TT-Client", CLIENT_TOKEN);
+        }
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
