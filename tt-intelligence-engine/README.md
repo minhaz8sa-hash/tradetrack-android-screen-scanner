@@ -60,6 +60,14 @@ Returns:
 - decision: CANDIDATE / LOCKED / NO_TRADE
 - target next-candle open time when the chart timer can be read
 
+### POST /v1/train-snapshot
+
+Upload one to three historical chart screenshots plus `actual_direction=UP|DOWN|DOJI`.
+The engine extracts the structure/candle sequence, builds psychology, creates the
+pattern fingerprint, and immediately labels the actual next-candle outcome.
+An optional `psychology_json` field can override the automatically derived
+psychology when a human-reviewed interpretation is available.
+
 ### POST /v1/training-examples
 
 Use this for curated historical/CK examples. Supply normalized chart features,
