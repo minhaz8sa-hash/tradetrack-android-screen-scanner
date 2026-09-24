@@ -10,6 +10,7 @@ from .models import (
     ManualPsychologyInput,
     OutcomeInput,
     OutcomeResponse,
+    TrainingExampleInput,
 )
 from .openai_analyzer import OpenAIChartAnalyzer
 from .storage import Storage
@@ -84,6 +85,26 @@ def manual_observation(item: ManualPsychologyInput) -> dict:
     payload = item.model_dump(mode="json")
     row_id = storage.save_manual_observation(payload)
     return {"saved": True, "observation_id": row_id}
+
+
+@app.post("/v1/training-examples")
+def training_example(item: TrainingExampleInput) -> dict:
+    analysis = engine.analyze_features(
+        item.features,
+        session_id=None,
+        analysis_mode="full",
+        psychology_override=item.psychology_override,
+    )
+    outcome = storage.record_outcome(
+        analysis.analysis_id,
+        item.actual_direction,
+        item.notes + (f" | tags={','.join(item.tags)}" if item.tags else ""),
+    )
+    return {
+        "saved": True,
+        "analysis": analysis.model_dump(mode="json"),
+        "outcome": outcome,
+    }
 
 
 @app.post("/v1/outcomes", response_model=OutcomeResponse)
