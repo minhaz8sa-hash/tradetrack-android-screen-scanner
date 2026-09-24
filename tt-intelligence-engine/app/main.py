@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import HTMLResponse
 
 from .engine import TTIntelligenceEngine
 from .models import (
@@ -27,6 +29,12 @@ storage = Storage()
 engine = TTIntelligenceEngine(storage)
 chart_analyzer = OpenAIChartAnalyzer()
 outcome_resolver = OpenAIOutcomeResolver()
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard() -> HTMLResponse:
+    path = Path(__file__).with_name("dashboard.html")
+    return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
 @app.get("/health")
