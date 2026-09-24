@@ -1,0 +1,4 @@
+{$TT_ENGINE_DOMAIN} {
+    encode gzip zstd
+    reverse_proxy tt-engine:8080
+}
