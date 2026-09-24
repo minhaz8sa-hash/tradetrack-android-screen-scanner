@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+
+from .engine import TTIntelligenceEngine
+from .models import (
+    AnalysisResponse,
+    ManualPsychologyInput,
+    OutcomeInput,
+    OutcomeResponse,
+)
+from .openai_analyzer import OpenAIChartAnalyzer
+from .storage import Storage
+
+
+app = FastAPI(
+    title="TT Intelligence Engine",
+    version="0.1.0",
+    description="Snapshot -> structure -> market psychology -> pattern memory -> decision.",
+)
+
+storage = Storage()
+engine = TTIntelligenceEngine(storage)
+chart_analyzer = OpenAIChartAnalyzer()
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"ok": True, "engine": "tt-intelligence", "version": "0.1.0"}
+
+
+@app.post("/v1/analyze", response_model=AnalysisResponse)
+async def analyze(
+    frame: UploadFile = File(...),
+    frame2: UploadFile | None = File(None),
+    frame3: UploadFile | None = File(None),
+    pair: str | None = Form(None),
+    timeframe: str = Form("1M"),
+    market_type: str = Form("UNKNOWN"),
+    analysis_mode: str = Form("full"),
+    scan_session_id: str | None = Form(None),
+    captured_at: str | None = Form(None),
+):
+    if analysis_mode not in {"full", "verify"}:
+        raise HTTPException(400, "analysis_mode must be full or verify")
+    if market_type not in {"REAL", "OTC", "UNKNOWN"}:
+        raise HTTPException(400, "market_type must be REAL, OTC, or UNKNOWN")
+
+    uploads = [frame, frame2, frame3]
+    frames: list[bytes] = []
+    for item in uploads:
+        if item is None:
+            continue
+        blob = await item.read()
+        if blob:
+            frames.append(blob)
+
+    if not frames:
+        raise HTTPException(400, "at least one snapshot is required")
+
+    try:
+        features = chart_analyzer.extract(
+            frames,
+            pair_hint=pair,
+            timeframe=timeframe,
+            market_type=market_type,
+            analysis_mode=analysis_mode,
+        )
+        dt = datetime.fromisoformat(captured_at.replace("Z", "+00:00")) if captured_at else datetime.now(timezone.utc)
+        return engine.analyze_features(
+            features,
+            session_id=scan_session_id,
+            analysis_mode=analysis_mode,
+            captured_at=dt,
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"analysis_failed: {exc}") from exc
+
+
+@app.post("/v1/manual-observation")
+def manual_observation(item: ManualPsychologyInput) -> dict:
+    payload = item.model_dump(mode="json")
+    row_id = storage.save_manual_observation(payload)
+    return {"saved": True, "observation_id": row_id}
+
+
+@app.post("/v1/outcomes", response_model=OutcomeResponse)
+def record_outcome(item: OutcomeInput):
+    try:
+        result = storage.record_outcome(item.analysis_id, item.actual_direction, item.notes)
+        return OutcomeResponse.model_validate(result)
+    except KeyError:
+        raise HTTPException(404, "analysis_id not found")
+
+
+@app.get("/v1/analyses/{analysis_id}")
+def get_analysis(analysis_id: str):
+    item = storage.get_analysis(analysis_id)
+    if item is None:
+        raise HTTPException(404, "analysis_id not found")
+    return item
