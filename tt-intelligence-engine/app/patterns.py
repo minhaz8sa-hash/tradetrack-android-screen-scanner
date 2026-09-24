@@ -58,7 +58,7 @@ class PatternEncoder:
         avg_lower = sum((c.lower_wick_ratio for c in recent), 0.0) / len(recent) if recent else 0.0
         avg_close = sum((c.close_position for c in recent), 0.0) / len(recent) if recent else 0.5
 
-        return [
+        base = [
             TREND.get(f.trend, 0.0),
             STRUCTURE.get(f.structure, 0.0),
             BREAKOUT.get(f.breakout_state, 0.0),
@@ -87,6 +87,27 @@ class PatternEncoder:
             p.exhaustion_down,
             p.trap_risk,
         ]
+
+        # Preserve candle order, not only averages. Left-pad to exactly six
+        # candles so equal formations map to equal vector positions.
+        sequence: list[float] = []
+        ordered = list(f.candles[-6:])
+        missing = 6 - len(ordered)
+        for _ in range(missing):
+            sequence.extend([0.0, 0.0, 0.0, 0.0, 0.0])
+        for candle in ordered:
+            range_scaled = max(-1.0, min(1.0, candle.range_relative - 1.0))
+            sequence.extend(
+                [
+                    candle.body_ratio,
+                    candle.upper_wick_ratio,
+                    candle.lower_wick_ratio,
+                    (candle.close_position * 2.0) - 1.0,
+                    range_scaled,
+                ]
+            )
+
+        return base + sequence
 
     def key(self, f: SnapshotFeatures, p: PsychologyState, vector: list[float]) -> str:
         core = vector[:15]
