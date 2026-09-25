@@ -3,65 +3,30 @@ from __future__ import annotations
 import base64
 import json
 import os
-from typing import Iterable
+from typing import Iterable, Literal, Optional
 
-from openai import OpenAI
+from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
 
-from .models import SnapshotFeatures
+from .models import CandleFeature, SnapshotFeatures
 
 
 SYSTEM_PROMPT = """
 You are the visual feature extractor for TT Intelligence Engine.
-You are NOT placing a trade. Extract only observable 1-minute chart evidence.
-
-Return exactly one JSON object matching this shape:
-{
-  "pair": "EUR/JPY",
-  "timeframe": "1M",
-  "market_type": "REAL|OTC|UNKNOWN",
-  "seconds_to_close": 12.0,
-  "trend": "BULLISH|BEARISH|RANGE|UNCLEAR",
-  "structure": "HH_HL|LH_LL|BREAKOUT_UP|BREAKOUT_DOWN|RANGE|REVERSAL_UP|REVERSAL_DOWN|UNCLEAR",
-  "breakout_state": "UP_HOLD|DOWN_HOLD|UP_RETEST|DOWN_RETEST|FAILED_UP|FAILED_DOWN|NONE|UNCLEAR",
-  "momentum_score": 0.0,
-  "volatility_score": 0.5,
-  "instability_score": 0.5,
-  "support_distance_atr": null,
-  "resistance_distance_atr": null,
-  "gap_fill_risk": 0.0,
-  "overextension_up": 0.0,
-  "overextension_down": 0.0,
-  "candles": [
-    {
-      "body_ratio": 0.0,
-      "upper_wick_ratio": 0.0,
-      "lower_wick_ratio": 0.0,
-      "close_position": 0.5,
-      "range_relative": 0.5
-    }
-  ],
-  "visible_support": null,
-  "visible_resistance": null,
-  "notes": []
-}
+Fill the provided structured schema from observable 1-minute candlestick-chart evidence only.
 
 Rules:
-- momentum_score is -1 strong selling to +1 strong buying.
-- All other score-like values are 0..1.
-- Candle body_ratio is -1..1; negative is bearish, positive is bullish.
-- Extract up to the most recent 12 visible candles, oldest to newest.
-- support_distance_atr/resistance_distance_atr are approximate distances in units
-  of recent average candle range; use null if not visually defensible.
-- Do not invent a pair, timer, support, resistance, or price not visible.
-- Treat metadata readability separately from chart readability: if pair/timer text is unreadable,
-  use UNKNOWN/null for only those fields, but still analyze visible candlestick trend, structure,
-  momentum, wicks, breakout/reversal behavior, support/resistance proximity, and instability.
-- Do NOT return all-neutral defaults merely because one UI label is unreadable.
-- Focus on the central candlestick chart. Ignore decorative UI, payout buttons, overlay bubbles,
-  and red zig-zag/trend-line drawings when determining candle structure.
-- If the candlesticks themselves are genuinely unreadable, use UNCLEAR and explain briefly in notes.
-- Current/running candle is evidence only; do not output an UP/DOWN trading signal.
-- Output JSON only, with no markdown.
+- Analyze the central candlestick chart, not decorative UI, payout buttons, signal bubbles, or red zig-zag/trend-line drawings.
+- Metadata readability is separate from chart readability. If pair or timer text is unreadable, use UNKNOWN/null only for that field and still analyze the candles.
+- Determine trend and market structure from the visible price action.
+- Extract at most the 6 most recent visible candles, oldest to newest.
+- candle body_ratio: -1 strong bearish to +1 strong bullish.
+- wick ratios and close_position are 0..1; range_relative is relative to recent average range.
+- momentum_score: -1 strong selling to +1 strong buying.
+- volatility_score, instability_score, gap_fill_risk, and overextension values are 0..1.
+- support_distance_atr/resistance_distance_atr are approximate distances in recent average candle ranges; null if not defensible.
+- The current running candle is evidence only. Do not output a trading instruction or guaranteed probability.
+- Use UNCLEAR only when the candlestick evidence itself is genuinely unreadable or conflicting.
 """.strip()
 
 
@@ -69,12 +34,36 @@ def _data_url(data: bytes) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(data).decode("ascii")
 
 
+class VisionSnapshot(BaseModel):
+    pair: str = "UNKNOWN"
+    market_type: Literal["REAL", "OTC", "UNKNOWN"] = "UNKNOWN"
+    seconds_to_close: Optional[float] = Field(default=None, ge=0.0, le=120.0)
+    trend: Literal["BULLISH", "BEARISH", "RANGE", "UNCLEAR"] = "UNCLEAR"
+    structure: Literal[
+        "HH_HL", "LH_LL", "BREAKOUT_UP", "BREAKOUT_DOWN",
+        "RANGE", "REVERSAL_UP", "REVERSAL_DOWN", "UNCLEAR"
+    ] = "UNCLEAR"
+    breakout_state: Literal[
+        "UP_HOLD", "DOWN_HOLD", "UP_RETEST", "DOWN_RETEST",
+        "FAILED_UP", "FAILED_DOWN", "NONE", "UNCLEAR"
+    ] = "UNCLEAR"
+    momentum_score: float = Field(0.0, ge=-1.0, le=1.0)
+    volatility_score: float = Field(0.5, ge=0.0, le=1.0)
+    instability_score: float = Field(0.5, ge=0.0, le=1.0)
+    support_distance_atr: Optional[float] = Field(default=None, ge=0.0, le=10.0)
+    resistance_distance_atr: Optional[float] = Field(default=None, ge=0.0, le=10.0)
+    gap_fill_risk: float = Field(0.0, ge=0.0, le=1.0)
+    overextension_up: float = Field(0.0, ge=0.0, le=1.0)
+    overextension_down: float = Field(0.0, ge=0.0, le=1.0)
+    candles: list[CandleFeature] = Field(default_factory=list, max_length=6)
+
+
 class OpenAIChartAnalyzer:
-    def __init__(self, client: OpenAI | None = None):
+    def __init__(self, client: AsyncOpenAI | None = None):
         self.client = client
         self.model = os.getenv("OPENAI_VISION_MODEL", "gpt-5.6-luna")
 
-    def extract(
+    async def extract(
         self,
         frames: Iterable[bytes],
         *,
@@ -100,27 +89,34 @@ class OpenAIChartAnalyzer:
                 ),
             }
         ]
+        image_detail = "high" if analysis_mode == "full" else "low"
         for frame in frames:
             content.append({
                 "type": "input_image",
                 "image_url": _data_url(frame),
-                "detail": "high",
+                "detail": image_detail,
             })
 
-        client = self.client or OpenAI()
+        if self.client is None:
+            self.client = AsyncOpenAI()
+        client = self.client
         last_error: Exception | None = None
 
         # Structured Outputs removes the prompt-only JSON parsing failure mode that
         # previously caused intermittent 502s. Retry at most once for transient
         # network/model errors; the Android client has a hard candle deadline.
-        max_attempts = 2 if analysis_mode == "full" else 1
+        # One bounded model call per stage. Android already has an independent
+        # late verification stage, so retrying a full vision request only burns the
+        # same candle deadline and can roll the UI into stale results.
+        max_attempts = 1
         for attempt in range(max_attempts):
             try:
-                response = client.responses.parse(
+                response = await client.responses.parse(
                     model=self.model,
                     input=[{"role": "user", "content": content}],
-                    text_format=SnapshotFeatures,
-                    timeout=9.0,
+                    text_format=VisionSnapshot,
+                    reasoning={"effort": "none"},
+                    timeout=8.0 if analysis_mode == "full" else 5.5,
                 )
                 parsed = response.output_parsed
                 if parsed is None:
@@ -166,13 +162,15 @@ Rules:
 
 
 class OpenAIOutcomeResolver:
-    def __init__(self, client: OpenAI | None = None):
+    def __init__(self, client: AsyncOpenAI | None = None):
         self.client = client
         self.model = os.getenv("OPENAI_VISION_MODEL", "gpt-5.6-luna")
 
-    def resolve(self, frame: bytes, *, pair_hint: str | None = None) -> dict:
-        client = self.client or OpenAI()
-        response = client.responses.create(
+    async def resolve(self, frame: bytes, *, pair_hint: str | None = None) -> dict:
+        if self.client is None:
+            self.client = AsyncOpenAI()
+        client = self.client
+        response = await client.responses.create(
             model=self.model,
             input=[
                 {

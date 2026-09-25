@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import asyncio
 import hmac
+import logging
 import os
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Request
@@ -31,6 +33,34 @@ storage = Storage()
 engine = TTIntelligenceEngine(storage)
 chart_analyzer = OpenAIChartAnalyzer()
 outcome_resolver = OpenAIOutcomeResolver()
+logger = logging.getLogger("tt_intelligence")
+
+
+async def _extract_chart_features(
+    frames: list[bytes],
+    *,
+    pair_hint: str | None,
+    timeframe: str,
+    market_type: str,
+    analysis_mode: str,
+):
+    return await asyncio.wait_for(
+        chart_analyzer.extract(
+            frames,
+            pair_hint=pair_hint,
+            timeframe=timeframe,
+            market_type=market_type,
+            analysis_mode=analysis_mode,
+        ),
+        timeout=9.0,
+    )
+
+
+async def _resolve_outcome(blob: bytes, *, pair_hint: str | None):
+    return await asyncio.wait_for(
+        outcome_resolver.resolve(blob, pair_hint=pair_hint),
+        timeout=9.0,
+    )
 
 
 @app.middleware("http")
@@ -89,7 +119,7 @@ async def analyze(
         raise HTTPException(400, "at least one snapshot is required")
 
     try:
-        features = chart_analyzer.extract(
+        features = await _extract_chart_features(
             frames,
             pair_hint=pair,
             timeframe=timeframe,
@@ -135,7 +165,7 @@ async def mobile_scan(
         raise HTTPException(400, "at least one snapshot is required")
 
     try:
-        features = chart_analyzer.extract(
+        features = await _extract_chart_features(
             frames,
             pair_hint=pair,
             timeframe=timeframe,
@@ -196,8 +226,21 @@ async def mobile_scan(
                 "decisionState": decision.state,
             },
         }
+    except asyncio.TimeoutError as exc:
+        logger.warning(
+            "mobile_scan_timeout mode=%s session=%s",
+            analysisMode,
+            scanSessionId,
+        )
+        raise HTTPException(504, "mobile_scan_timeout") from exc
     except Exception as exc:
-        raise HTTPException(502, f"mobile_scan_failed: {exc}") from exc
+        logger.exception(
+            "mobile_scan_failed mode=%s session=%s type=%s",
+            analysisMode,
+            scanSessionId,
+            type(exc).__name__,
+        )
+        raise HTTPException(502, "mobile_scan_failed") from exc
 
 
 @app.post("/v1/outcome-snapshot")
@@ -214,7 +257,7 @@ async def outcome_snapshot(
         raise HTTPException(404, "analysisId not found")
 
     try:
-        resolved = outcome_resolver.resolve(
+        resolved = await _resolve_outcome(
             blob,
             pair_hint=pair or analysis.get("pair"),
         )
@@ -279,7 +322,7 @@ async def train_snapshot(
         raise HTTPException(400, "at least one snapshot is required")
 
     try:
-        features = chart_analyzer.extract(
+        features = await _extract_chart_features(
             frames,
             pair_hint=pair,
             timeframe=timeframe,
