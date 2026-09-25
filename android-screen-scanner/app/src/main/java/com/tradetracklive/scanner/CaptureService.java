@@ -37,10 +37,6 @@ public class CaptureService extends Service {
     public static final String EXTRA_RESULT_DATA = "resultData";
 
     private static final String CHANNEL_ID = "ttl_screen_scanner";
-    private static final String ENDPOINT =
-            "https://base44.app/api/apps/6a1d6d69aab915d09b7b082d/functions/analyzeMobileScreenCapture";
-    private static final String APP_ID = "6a1d6d69aab915d09b7b082d";
-
     private WindowManager windowManager;
     private TextView bubble;
     private WindowManager.LayoutParams bubbleParams;
@@ -70,7 +66,7 @@ public class CaptureService extends Service {
 
             long remainingMs = estimatedCloseEpochMs - System.currentTimeMillis();
 
-            if (remainingMs <= 5000 && remainingMs >= 2000 && heldCandidateReady && heldSourceSeconds >= 0 && heldSourceSeconds <= 15) {
+            if (remainingMs <= 5000 && remainingMs >= 2000 && heldCandidateReady && heldSourceSeconds >= 10 && heldSourceSeconds <= 20 && !analyzing) {
                 releaseHeldSignal();
                 return;
             }
@@ -170,7 +166,7 @@ public class CaptureService extends Service {
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
         bubbleParams = new WindowManager.LayoutParams(
-                dp(108), dp(88), type,
+                dp(190), dp(120), type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
@@ -220,7 +216,7 @@ public class CaptureService extends Service {
     }
 
     private void armScanner() {
-        if (imageReader == null || bubble == null) return;
+        if (imageReader == null || bubble == null || armed || analyzing) return;
         armed = true;
         scanAttempt = 0;
         scanSessionId = UUID.randomUUID().toString();
@@ -237,11 +233,14 @@ public class CaptureService extends Service {
         mainHandler.post(finalWindowWatcher);
         bubble.setText("ARMED\nSCANNING");
         bubble.setContentDescription("Scanner armed. Current candle is evidence only. Signal target is NEXT candle.");
+        final String armedSession=scanSessionId;
+        mainHandler.postDelayed(()->{if(armed && armedSession.equals(scanSessionId))finishNoTrade("Scan timed out");},65000);
         captureAndAnalyze();
     }
 
     private void cancelArmedScan() {
         armed = false;
+        analyzing = false;
         scanSessionId = null;
         scanAttempt = 0;
         estimatedCloseEpochMs = 0L;
@@ -255,11 +254,14 @@ public class CaptureService extends Service {
     }
 
     private void releaseHeldSignal() {
-        if (!armed || bubble == null || !heldCandidateReady) return;
+        if (!armed || bubble == null || !heldCandidateReady || analyzing) return;
+        long left=estimatedCloseEpochMs-System.currentTimeMillis();
+        if(left<2000 || left>5000) return;
 
         String arrow = "UP".equals(heldDirection) ? "↑" : "↓";
         bubble.setVisibility(View.VISIBLE);
-        bubble.setText("NEXT " + arrow + " " + heldDirection + "\n↑" + heldUp + "%  ↓" + heldDown + "%");
+        java.text.SimpleDateFormat fmt=new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault());
+        bubble.setText("NEXT CANDLE " + arrow + " " + heldDirection + "\n"+heldAsset+"\nEntry "+fmt.format(new java.util.Date(estimatedCloseEpochMs))+"\nEnd "+fmt.format(new java.util.Date(estimatedCloseEpochMs+60000)));
         bubble.setContentDescription(
                 heldAsset + " " + heldPayout + "%. Signal target NEXT candle. " +
                         heldDirection + ". UP " + heldUp + "%, DOWN " + heldDown +
@@ -274,7 +276,7 @@ public class CaptureService extends Service {
 
         mainHandler.postDelayed(() -> {
             if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
-        }, 12000);
+        }, Math.max(0,left));
     }
 
     private void finishNoTrade(String reason) {
@@ -320,6 +322,10 @@ public class CaptureService extends Service {
                     if (i == 0) Thread.sleep(160);
                     else Thread.sleep(frameIntervalMs);
 
+                    // Drain the queued old frame, then wait for a newly produced screen frame.
+                    Image stale=imageReader.acquireLatestImage();
+                    if(stale!=null)stale.close();
+                    Thread.sleep(120);
                     Bitmap raw = acquireLatestBitmap();
                     if (raw == null) continue;
 
@@ -367,14 +373,15 @@ public class CaptureService extends Service {
                 mainHandler.post(() -> {
                     if (bubble == null) return;
                     if (!armed || thisSessionId == null || !thisSessionId.equals(scanSessionId)) {
-                        analyzing = false;
                         return;
                     }
 
+                    if(!thisSessionId.equals(scan.optString("scanSessionId")) || !"NEXT_CANDLE".equals(scan.optString("targetCandle")) || scan.optBoolean("fatal")){finishNoTrade("Candle/session mismatch");return;}
                     if (!estimatedCloseAt.isEmpty()) {
                         try {
                             long parsed = Instant.parse(estimatedCloseAt).toEpochMilli();
                             if (parsed > System.currentTimeMillis()) {
+                                if(estimatedCloseEpochMs>0 && Math.abs(parsed-estimatedCloseEpochMs)>1800){finishNoTrade("Candle changed");return;}
                                 estimatedCloseEpochMs = parsed;
                                 mainHandler.removeCallbacks(finalWindowWatcher);
                                 mainHandler.post(finalWindowWatcher);
@@ -382,7 +389,7 @@ public class CaptureService extends Service {
                         } catch (Exception ignored) {}
                     }
 
-                    if (candidateReady && ("UP".equals(candidateDirection) || "DOWN".equals(candidateDirection)) && instability <= 45) {
+                    if (candidateReady && ("UP".equals(candidateDirection) || "DOWN".equals(candidateDirection)) && instability <= 45 && sourceSeconds >= 10 && sourceSeconds <= 20) {
                         heldCandidateReady = true;
                         heldDirection = candidateDirection;
                         heldUp = up;
@@ -391,7 +398,7 @@ public class CaptureService extends Service {
                         heldSourceSeconds = sourceSeconds;
                         heldAsset = asset;
                         heldPayout = payout;
-                    } else if (sourceSeconds >= 0 && sourceSeconds <= 15) {
+                    } else {
                         // A later verification has priority. If it becomes unstable or loses confirmation,
                         // discard the older candidate rather than showing stale confidence at T-5.
                         heldCandidateReady = false;
@@ -416,7 +423,7 @@ public class CaptureService extends Service {
                         bubble.setText("UNSTABLE\nKEEP SCAN");
                     } else {
                         String time = remainingMs > 0 ? Math.max(0, Math.round(remainingMs / 1000f)) + "s" : "";
-                        String held = heldCandidateReady ? " • HELD " + heldDirection : "";
+                        String held = heldCandidateReady ? " • VERIFIED" : "";
                         bubble.setText("SCANNING " + time + "\nNEXT" + held);
                     }
 
@@ -426,7 +433,7 @@ public class CaptureService extends Service {
 
                     // Do not start a new cloud analysis inside the final ~9 seconds.
                     // The locally held candidate is released by finalWindowWatcher at T-5..T-2.
-                    if (remainingMs > 9000 || remainingMs < 0) {
+                    if (remainingMs > 10000 || remainingMs < 0) {
                         long delayMs;
                         if (remainingMs > 30000) delayMs = 4500;
                         else if (remainingMs > 22000) delayMs = 3000;
@@ -442,6 +449,9 @@ public class CaptureService extends Service {
                 mainHandler.post(() -> {
                     if (bubble == null) return;
                     bubble.setVisibility(View.VISIBLE);
+                    if(!armed || !thisSessionId.equals(scanSessionId))return;
+                    heldCandidateReady=false;
+                    if(scanAttempt>=3){finishNoTrade(e.getMessage());return;}
                     bubble.setText("RETRYING\nSCAN");
                     bubble.setContentDescription(e.getMessage());
                     analyzing = false;
@@ -515,12 +525,12 @@ public class CaptureService extends Service {
             String analysisMode
     ) throws Exception {
         String boundary = "----TTL" + System.currentTimeMillis();
-        HttpURLConnection conn = (HttpURLConnection) new URL(ENDPOINT).openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(getSharedPreferences("backend",0).getString("url","")).openConnection();
         conn.setConnectTimeout(10000);
-        conn.setReadTimeout(30000);
+        conn.setReadTimeout(17000);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
-        conn.setRequestProperty("X-App-Id", APP_ID);
+        conn.setRequestProperty("Authorization", "Bearer "+getSharedPreferences("backend",0).getString("token",""));
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {

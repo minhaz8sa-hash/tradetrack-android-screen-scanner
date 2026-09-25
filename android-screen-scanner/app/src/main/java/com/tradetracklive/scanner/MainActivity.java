@@ -13,6 +13,7 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -57,6 +58,16 @@ public class MainActivity extends Activity {
 
         root.addView(title, lp(-1, dp(42), 0));
         root.addView(subtitle, lp(-1, dp(42), 0));
+        EditText endpoint=new EditText(this); endpoint.setTextColor(Color.WHITE);endpoint.setHintTextColor(Color.GRAY);
+        endpoint.setHint("HTTPS backend URL /analyze");endpoint.setText(getSharedPreferences("backend",0).getString("url",""));
+        EditText token=new EditText(this);token.setTextColor(Color.WHITE);token.setHintTextColor(Color.GRAY);token.setHint("Scanner access token");token.setInputType(129);
+        token.setText(getSharedPreferences("backend",0).getString("token",""));
+        Button save=button("Save backend settings");save.setOnClickListener(v->{
+            String u=endpoint.getText().toString().trim();
+            if(!u.startsWith("https://")){endpoint.setError("HTTPS URL required");return;}
+            getSharedPreferences("backend",0).edit().putString("url",u).putString("token",token.getText().toString().trim()).apply();
+        });
+        root.addView(endpoint);root.addView(token);root.addView(save);
         root.addView(start, lp(-1, dp(52), dp(18)));
         root.addView(stop, lp(-1, dp(48), dp(10)));
         root.addView(note, lp(-1, ViewGroup.LayoutParams.WRAP_CONTENT, dp(20)));
