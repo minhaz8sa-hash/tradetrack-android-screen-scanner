@@ -62,10 +62,18 @@ jobs:
           if [ -z "$ENDPOINT" ]; then
             ENDPOINT="${{ vars.TT_ENGINE_ENDPOINT }}"
           fi
-          echo "Building TT SCAN v2 (endpoint configured: $([ -n "$ENDPOINT" ] && echo yes || echo no))"
+          if [ -z "$ENDPOINT" ]; then
+            ENDPOINT="https://previously-rca-supplemental-restrict.trycloudflare.com/v1/mobile-scan"
+          fi
+          CLIENT_TOKEN="${{ secrets.TT_CLIENT_TOKEN }}"
+          echo "Building TT SCAN v2 (endpoint configured: $([ -n "$ENDPOINT" ] && echo yes || echo no), token configured: $([ -n "$CLIENT_TOKEN" ] && echo yes || echo no))"
+          if [ -z "$ENDPOINT" ] || [ -z "$CLIENT_TOKEN" ]; then
+            echo "Required TT build configuration is missing."
+            exit 1
+          fi
           gradle :app:assembleDebug --stacktrace \
             -PTT_ENGINE_ENDPOINT="$ENDPOINT" \
-            -PTT_CLIENT_TOKEN="${{ secrets.TT_CLIENT_TOKEN }}"
+            -PTT_CLIENT_TOKEN="$CLIENT_TOKEN"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
