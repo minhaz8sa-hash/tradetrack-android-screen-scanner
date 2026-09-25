@@ -24,6 +24,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,9 +39,8 @@ public class CaptureService extends Service {
     public static final String EXTRA_RESULT_DATA = "resultData";
 
     private static final String CHANNEL_ID = "ttl_screen_scanner";
-    private static final String ENDPOINT =
-            "https://base44.app/api/apps/6a1d6d69aab915d09b7b082d/functions/analyzeMobileScreenCapture";
-    private static final String APP_ID = "6a1d6d69aab915d09b7b082d";
+    private static final String ENDPOINT = BuildConfig.TT_ENGINE_ENDPOINT;
+    private static final String CLIENT_TOKEN = BuildConfig.TT_CLIENT_TOKEN;
 
     private WindowManager windowManager;
     private TextView bubble;
@@ -52,7 +53,15 @@ public class CaptureService extends Service {
     private boolean armed = false;
     private String scanSessionId = null;
     private int scanAttempt = 0;
+    private int fullRetries = 0;
+    private int verifyRetries = 0;
+    private boolean fullAnalysisDone = false;
+    private boolean verifyScheduled = false;
+    private boolean verifyAnalysisDone = false;
+    private String earlyDirection = "";
+    private long verifyCompletedEpochMs = 0L;
     private long estimatedCloseEpochMs = 0L;
+    private long scanStartedEpochMs = 0L;
     private boolean heldCandidateReady = false;
     private String heldDirection = "";
     private int heldUp = 50;
@@ -61,7 +70,12 @@ public class CaptureService extends Service {
     private double heldSourceSeconds = -1;
     private String heldAsset = "—";
     private int heldPayout = 0;
+    private String heldAnalysisId = "";
     private boolean stopping = false;
+    private static final long CANDLE_MS = 60_000L;
+    private static final long VERIFY_LEAD_MS = 12_000L;
+    private static final long FINAL_SIGNAL_START_MS = 5_000L;
+    private static final long FINAL_SIGNAL_END_MS = 2_000L;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private final Runnable finalWindowWatcher = new Runnable() {
@@ -70,13 +84,19 @@ public class CaptureService extends Service {
 
             long remainingMs = estimatedCloseEpochMs - System.currentTimeMillis();
 
-            if (remainingMs <= 5000 && remainingMs >= 2000 && heldCandidateReady && heldSourceSeconds >= 0 && heldSourceSeconds <= 15) {
+            if (
+                    remainingMs <= FINAL_SIGNAL_START_MS
+                    && remainingMs >= FINAL_SIGNAL_END_MS
+                    && heldCandidateReady
+                    && verifyAnalysisDone
+                    && verifyCompletedEpochMs >= estimatedCloseEpochMs - 18_000L
+            ) {
                 releaseHeldSignal();
                 return;
             }
 
-            if (remainingMs < 2000) {
-                finishNoTrade("No stable next-candle confirmation before close");
+            if (remainingMs < FINAL_SIGNAL_END_MS) {
+                finishNoTrade("No stable late verification before the locked target candle.");
                 return;
             }
 
@@ -221,10 +241,29 @@ public class CaptureService extends Service {
 
     private void armScanner() {
         if (imageReader == null || bubble == null) return;
+        if (ENDPOINT == null || ENDPOINT.trim().isEmpty()) {
+            bubble.setVisibility(View.VISIBLE);
+            bubble.setText("ENGINE URL\nMISSING");
+            bubble.setContentDescription("TT Intelligence Engine endpoint is not configured in this APK build.");
+            return;
+        }
         armed = true;
         scanAttempt = 0;
+        fullRetries = 0;
+        verifyRetries = 0;
+        fullAnalysisDone = false;
+        verifyScheduled = false;
+        verifyAnalysisDone = false;
+        earlyDirection = "";
+        verifyCompletedEpochMs = 0L;
         scanSessionId = UUID.randomUUID().toString();
-        estimatedCloseEpochMs = 0L;
+
+        long now = System.currentTimeMillis();
+        scanStartedEpochMs = now;
+        // One tap = exactly one target candle. Lock to the next 1M boundary
+        // immediately; never let a late cloud response roll the target forward.
+        estimatedCloseEpochMs = ((now / CANDLE_MS) + 1L) * CANDLE_MS;
+
         heldCandidateReady = false;
         heldDirection = "";
         heldUp = 50;
@@ -233,19 +272,33 @@ public class CaptureService extends Service {
         heldSourceSeconds = -1;
         heldAsset = "—";
         heldPayout = 0;
+        heldAnalysisId = "";
+
         mainHandler.removeCallbacks(finalWindowWatcher);
         mainHandler.post(finalWindowWatcher);
-        bubble.setText("ARMED\nSCANNING");
-        bubble.setContentDescription("Scanner armed. Current candle is evidence only. Signal target is NEXT candle.");
-        captureAndAnalyze();
+        bubble.setText("ARMED\nNEXT " + formatTargetTime(estimatedCloseEpochMs));
+        bubble.setContentDescription(
+                "Scanner armed. Target candle is locked to " +
+                        formatTargetTime(estimatedCloseEpochMs) + "."
+        );
+        captureAndAnalyze("full");
     }
 
     private void cancelArmedScan() {
         armed = false;
         scanSessionId = null;
         scanAttempt = 0;
+        fullRetries = 0;
+        verifyRetries = 0;
+        fullAnalysisDone = false;
+        verifyScheduled = false;
+        verifyAnalysisDone = false;
+        earlyDirection = "";
+        verifyCompletedEpochMs = 0L;
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = 0L;
         heldCandidateReady = false;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
         if (bubble != null) {
             bubble.setVisibility(View.VISIBLE);
@@ -257,24 +310,70 @@ public class CaptureService extends Service {
     private void releaseHeldSignal() {
         if (!armed || bubble == null || !heldCandidateReady) return;
 
-        String arrow = "UP".equals(heldDirection) ? "↑" : "↓";
+        final String direction = heldDirection;
+        final String analysisId = heldAnalysisId;
+        final String asset = heldAsset;
+        final int up = heldUp;
+        final int down = heldDown;
+        final int instability = heldInstability;
+        final long targetOpenMs = estimatedCloseEpochMs;
+        final String arrow = "UP".equals(direction) ? "↑" : "↓";
+        final String targetTime = formatTargetTime(targetOpenMs);
+
         bubble.setVisibility(View.VISIBLE);
-        bubble.setText("NEXT " + arrow + " " + heldDirection + "\n↑" + heldUp + "%  ↓" + heldDown + "%");
+        bubble.setText("NEXT " + targetTime + "\n" + arrow + " " + direction + " LOCKED");
         bubble.setContentDescription(
-                heldAsset + " " + heldPayout + "%. Signal target NEXT candle. " +
-                        heldDirection + ". UP " + heldUp + "%, DOWN " + heldDown +
-                        "%. Final instability " + heldInstability + "."
+                asset + ". Locked signal for the next candle opening at " + targetTime + ". " +
+                        direction + ". UP " + up + "%, DOWN " + down +
+                        "%. Final instability " + instability + "."
         );
 
         armed = false;
         analyzing = false;
         scanSessionId = null;
+        fullAnalysisDone = false;
+        verifyScheduled = false;
+        verifyAnalysisDone = false;
+        earlyDirection = "";
+        verifyCompletedEpochMs = 0L;
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = 0L;
+        heldCandidateReady = false;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
+
+        long untilOpen = Math.max(0L, targetOpenMs - System.currentTimeMillis());
+        mainHandler.postDelayed(() -> {
+            if (bubble == null || armed) return;
+            bubble.setVisibility(View.VISIBLE);
+            bubble.setText("ENTER NEXT " + arrow + "\n" + direction + " • " + targetTime);
+            bubble.setContentDescription("Entry window for the " + targetTime + " target candle. " + direction + ".");
+        }, untilOpen);
+
+        mainHandler.postDelayed(() -> {
+            if (bubble == null || armed) return;
+            bubble.setText("SIGNAL EXPIRED\nDO NOT CHASE");
+            bubble.setContentDescription("The entry window for the target candle has expired.");
+        }, untilOpen + 3000L);
 
         mainHandler.postDelayed(() -> {
             if (bubble != null && !armed && !analyzing) bubble.setText("TT\nSCAN");
-        }, 12000);
+        }, untilOpen + 9000L);
+
+        if (analysisId != null && !analysisId.isEmpty() && targetOpenMs > 0L) {
+            scheduleOutcomeCapture(analysisId, asset, targetOpenMs);
+        }
+    }
+
+    private String formatTargetTime(long epochMs) {
+        if (epochMs <= 0L) return "NEXT";
+        try {
+            return Instant.ofEpochMilli(epochMs)
+                    .atZone(ZoneId.systemDefault())
+                    .format(DateTimeFormatter.ofPattern("HH:mm"));
+        } catch (Exception ignored) {
+            return "NEXT";
+        }
     }
 
     private void finishNoTrade(String reason) {
@@ -286,8 +385,15 @@ public class CaptureService extends Service {
         armed = false;
         analyzing = false;
         scanSessionId = null;
+        fullAnalysisDone = false;
+        verifyScheduled = false;
+        verifyAnalysisDone = false;
+        earlyDirection = "";
+        verifyCompletedEpochMs = 0L;
         estimatedCloseEpochMs = 0L;
+        scanStartedEpochMs = 0L;
         heldCandidateReady = false;
+        heldAnalysisId = "";
         mainHandler.removeCallbacks(finalWindowWatcher);
 
         mainHandler.postDelayed(() -> {
@@ -295,30 +401,66 @@ public class CaptureService extends Service {
         }, 7000);
     }
 
-    private void captureAndAnalyze() {
+    private void scheduleSingleVerification() {
+        if (!armed || bubble == null || verifyScheduled || estimatedCloseEpochMs <= 0L) return;
+
+        long now = System.currentTimeMillis();
+        long remainingMs = estimatedCloseEpochMs - now;
+        if (remainingMs <= 7000L) {
+            finishNoTrade("Full analysis finished too late for a safe late verification.");
+            return;
+        }
+
+        verifyScheduled = true;
+        long verifyAtMs = estimatedCloseEpochMs - VERIFY_LEAD_MS;
+        long delayMs = Math.max(0L, verifyAtMs - now);
+
+        if (earlyDirection != null && !earlyDirection.isEmpty()) {
+            bubble.setText("CANDIDATE " + earlyDirection + "\nVERIFY T-12");
+        } else {
+            bubble.setText("WAIT\nVERIFY T-12");
+        }
+
+        mainHandler.postDelayed(() -> {
+            if (!armed || analyzing || verifyAnalysisDone || bubble == null) return;
+            captureAndAnalyze("verify");
+        }, delayMs);
+    }
+
+    private void captureAndAnalyze(String analysisMode) {
         if (!armed || analyzing || imageReader == null || bubble == null) return;
+        if (!"full".equals(analysisMode) && !"verify".equals(analysisMode)) return;
+
+        long remainingBeforeCapture = estimatedCloseEpochMs - System.currentTimeMillis();
+        if (remainingBeforeCapture <= FINAL_SIGNAL_END_MS) {
+            finishNoTrade("Target candle deadline already reached.");
+            return;
+        }
+        if ("full".equals(analysisMode) && fullAnalysisDone) return;
+        if ("verify".equals(analysisMode) && (!fullAnalysisDone || verifyAnalysisDone)) return;
 
         analyzing = true;
         scanAttempt++;
         final String thisSessionId = scanSessionId;
-        final String analysisMode = scanAttempt == 1 ? "full" : "verify";
-        bubble.setText("CAPTURING\n" + scanAttempt);
+        final String thisMode = analysisMode;
+        bubble.setText("CAPTURING\n" + ("full".equals(thisMode) ? "FULL" : "VERIFY"));
         bubble.setVisibility(View.INVISIBLE);
 
         io.submit(() -> {
             try {
-                final int frameIntervalMs = analysisMode.equals("full") ? 750 : 0;
-                final int targetFrames = analysisMode.equals("full") ? 3 : 1;
-                final int maxWidth = analysisMode.equals("full") ? 900 : 720;
-                final int jpegQuality = analysisMode.equals("full") ? 78 : 70;
+                // Fast mode: one screenshot contains the recent candle sequence.
+                // A second OpenAI call at T-12 supplies the temporal/late verification.
+                final int frameIntervalMs = 0;
+                final int targetFrames = 1;
+                final int maxWidth = "full".equals(thisMode) ? 768 : 640;
+                final int jpegQuality = "full".equals(thisMode) ? 72 : 66;
 
                 List<byte[]> frames = new ArrayList<>();
                 int outWidth = 0;
                 int outHeight = 0;
 
                 for (int i = 0; i < targetFrames; i++) {
-                    if (i == 0) Thread.sleep(160);
-                    else Thread.sleep(frameIntervalMs);
+                    Thread.sleep(120);
 
                     Bitmap raw = acquireLatestBitmap();
                     if (raw == null) continue;
@@ -342,12 +484,12 @@ public class CaptureService extends Service {
                 mainHandler.post(() -> {
                     if (bubble != null && armed && thisSessionId != null && thisSessionId.equals(scanSessionId)) {
                         bubble.setVisibility(View.VISIBLE);
-                        bubble.setText("ANALYZING\nNEXT");
+                        bubble.setText("ANALYZING\n" + ("full".equals(thisMode) ? "FULL" : "VERIFY"));
                     }
                 });
 
                 JSONObject result = postFrames(
-                        frames, outWidth, outHeight, frameIntervalMs, thisSessionId, analysisMode
+                        frames, outWidth, outHeight, frameIntervalMs, thisSessionId, thisMode
                 );
                 JSONObject scan = result.optJSONObject("scan");
                 if (scan == null) throw new IOException(result.optString("error", "No scan result"));
@@ -358,11 +500,12 @@ public class CaptureService extends Service {
                 double sourceSeconds = scan.optDouble("secondsToCandleClose", -1);
                 boolean candidateReady = scan.optBoolean("candidateReady", false);
                 String candidateDirection = scan.optString("candidateDirection", "SKIP").toUpperCase();
+                String decisionState = scan.optString("decisionState", "").toUpperCase();
                 int instability = (int) Math.round(scan.optDouble("endInstabilityScore", 100));
-                String estimatedCloseAt = scan.optString("estimatedCandleCloseAt", "");
                 String asset = scan.optString("asset", "—");
                 int payout = (int) Math.round(scan.optDouble("payout", 0));
                 String rationale = scan.optString("rationale", "");
+                String analysisId = scan.optString("analysisId", "");
 
                 mainHandler.post(() -> {
                     if (bubble == null) return;
@@ -371,18 +514,55 @@ public class CaptureService extends Service {
                         return;
                     }
 
-                    if (!estimatedCloseAt.isEmpty()) {
-                        try {
-                            long parsed = Instant.parse(estimatedCloseAt).toEpochMilli();
-                            if (parsed > System.currentTimeMillis()) {
-                                estimatedCloseEpochMs = parsed;
-                                mainHandler.removeCallbacks(finalWindowWatcher);
-                                mainHandler.post(finalWindowWatcher);
-                            }
-                        } catch (Exception ignored) {}
+                    bubble.setVisibility(View.VISIBLE);
+                    bubble.setContentDescription(
+                            asset + " " + payout + "%. NEXT candle technical scores: UP " +
+                                    up + ", DOWN " + down + ". " + rationale
+                    );
+
+                    if ("full".equals(thisMode)) {
+                        fullAnalysisDone = true;
+
+                        if (
+                                "CANDIDATE".equals(decisionState)
+                                && ("UP".equals(candidateDirection) || "DOWN".equals(candidateDirection))
+                                && !"NO_TRADE".equals(biasState)
+                        ) {
+                            earlyDirection = candidateDirection;
+                            bubble.setText(
+                                    "CANDIDATE " + candidateDirection + "\n" +
+                                            "UP " + up + " • DOWN " + down
+                            );
+                        } else {
+                            earlyDirection = "";
+                            bubble.setText("WAIT\nLATE VERIFY");
+                        }
+
+                        analyzing = false;
+                        scheduleSingleVerification();
+                        return;
                     }
 
-                    if (candidateReady && ("UP".equals(candidateDirection) || "DOWN".equals(candidateDirection)) && instability <= 45) {
+                    verifyAnalysisDone = true;
+                    verifyCompletedEpochMs = System.currentTimeMillis();
+
+                    boolean directionValid =
+                            "UP".equals(candidateDirection) || "DOWN".equals(candidateDirection);
+                    boolean sameAsEarly =
+                            directionValid && earlyDirection != null && !earlyDirection.isEmpty()
+                                    && earlyDirection.equals(candidateDirection);
+                    boolean lateOnlyStrong =
+                            directionValid
+                                    && (earlyDirection == null || earlyDirection.isEmpty())
+                                    && Math.max(up, down) >= 72
+                                    && instability <= 35;
+
+                    if (
+                            candidateReady
+                                    && directionValid
+                                    && instability <= 60
+                                    && (sameAsEarly || lateOnlyStrong)
+                    ) {
                         heldCandidateReady = true;
                         heldDirection = candidateDirection;
                         heldUp = up;
@@ -391,66 +571,64 @@ public class CaptureService extends Service {
                         heldSourceSeconds = sourceSeconds;
                         heldAsset = asset;
                         heldPayout = payout;
-                    } else if (sourceSeconds >= 0 && sourceSeconds <= 15) {
-                        // A later verification has priority. If it becomes unstable or loses confirmation,
-                        // discard the older candidate rather than showing stale confidence at T-5.
-                        heldCandidateReady = false;
-                    }
+                        heldAnalysisId = analysisId;
 
-                    bubble.setVisibility(View.VISIBLE);
-                    bubble.setContentDescription(
-                            asset + " " + payout + "%. Current candle is evidence only. NEXT candle UP " +
-                                    up + "%, DOWN " + down + "%. " + rationale
-                    );
-
-                    long remainingMs = estimatedCloseEpochMs > 0L
-                            ? estimatedCloseEpochMs - System.currentTimeMillis()
-                            : -1L;
-
-                    if ("NO_TRADE".equals(biasState)) {
-                        // One transient unreadable/weak frame must not stop the armed workflow.
-                        // Keep scanning until the local final-window watcher reaches T-2.
-                        heldCandidateReady = false;
-                        bubble.setText("CHECKING\nKEEP SCAN");
-                    } else if ("UNSTABLE".equals(biasState)) {
-                        bubble.setText("UNSTABLE\nKEEP SCAN");
-                    } else {
-                        String time = remainingMs > 0 ? Math.max(0, Math.round(remainingMs / 1000f)) + "s" : "";
-                        String held = heldCandidateReady ? " • HELD " + heldDirection : "";
-                        bubble.setText("SCANNING " + time + "\nNEXT" + held);
+                        bubble.setText(
+                                "VERIFIED " + candidateDirection + "\nWAIT NEXT"
+                        );
+                        analyzing = false;
+                        return;
                     }
 
                     analyzing = false;
+                    heldCandidateReady = false;
+                    heldAnalysisId = "";
 
-                    if (!armed) return;
-
-                    // Do not start a new cloud analysis inside the final ~9 seconds.
-                    // The locally held candidate is released by finalWindowWatcher at T-5..T-2.
-                    if (remainingMs > 9000 || remainingMs < 0) {
-                        long delayMs;
-                        if (remainingMs > 30000) delayMs = 4500;
-                        else if (remainingMs > 22000) delayMs = 3000;
-                        else if (remainingMs > 14000) delayMs = 1400;
-                        else delayMs = 500;
-
-                        mainHandler.postDelayed(() -> {
-                            if (armed && !analyzing && bubble != null) captureAndAnalyze();
-                        }, delayMs);
+                    if (
+                            directionValid
+                                    && earlyDirection != null
+                                    && !earlyDirection.isEmpty()
+                                    && !earlyDirection.equals(candidateDirection)
+                    ) {
+                        finishNoTrade("Late verification contradicted the early candidate; no direction flip.");
+                    } else {
+                        finishNoTrade("Late verification did not confirm a stable next-candle setup.");
                     }
                 });
             } catch (Exception e) {
                 mainHandler.post(() -> {
                     if (bubble == null) return;
-                    bubble.setVisibility(View.VISIBLE);
-                    bubble.setText("RETRYING\nSCAN");
-                    bubble.setContentDescription(e.getMessage());
                     analyzing = false;
+                    if (!armed) return;
 
-                    if (armed) {
-                        mainHandler.postDelayed(() -> {
-                            if (armed && !analyzing && bubble != null) captureAndAnalyze();
-                        }, 1200);
+                    String message = e.getMessage() == null ? "unknown engine error" : e.getMessage();
+
+                    if ("full".equals(thisMode)) {
+                        // Do not finalize NO TRADE early. If the early/full cloud pass fails
+                        // but the target candle is still alive, keep the same locked target
+                        // and give T-12 one independent late verification chance.
+                        fullAnalysisDone = true;
+                        earlyDirection = "";
+                        long remainingMs = estimatedCloseEpochMs - System.currentTimeMillis();
+
+                        if (remainingMs > 7000L) {
+                            bubble.setVisibility(View.VISIBLE);
+                            bubble.setText("FULL UNCLEAR\nVERIFY T-12");
+                            bubble.setContentDescription(
+                                    "Early analysis unavailable. One late verification remains for the same target candle. " +
+                                            message
+                            );
+                            scheduleSingleVerification();
+                            return;
+                        }
                     }
+
+                    // Late verification is one-shot. Missing that deadline means NO TRADE
+                    // for this target; never roll into the following candle.
+                    finishNoTrade(
+                            ("full".equals(thisMode) ? "Full analysis failed too late: " : "Late verification failed: ")
+                                    + message
+                    );
                 });
             }
         });
@@ -520,7 +698,10 @@ public class CaptureService extends Service {
         conn.setReadTimeout(30000);
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
-        conn.setRequestProperty("X-App-Id", APP_ID);
+        conn.setRequestProperty("Accept", "application/json");
+        if (CLIENT_TOKEN != null && !CLIENT_TOKEN.isEmpty()) {
+            conn.setRequestProperty("X-TT-Client", CLIENT_TOKEN);
+        }
         conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
         try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
@@ -552,10 +733,88 @@ public class CaptureService extends Service {
         String body = readAll(stream);
         JSONObject json = new JSONObject(body);
         if (code < 200 || code >= 300 || !json.optBoolean("success", false)) {
-            throw new IOException(json.optString("error", "HTTP " + code));
+            String detail = json.optString("detail", "");
+            String error = json.optString("error", "");
+            String message = !detail.isEmpty() ? detail : (!error.isEmpty() ? error : "HTTP " + code);
+            throw new IOException(message);
         }
         return json;
     }
+
+    private void scheduleOutcomeCapture(String analysisId, String asset, long targetOpenMs) {
+        long captureAtMs = targetOpenMs + 62000L;
+        long delay = Math.max(0L, captureAtMs - System.currentTimeMillis());
+
+        mainHandler.postDelayed(() -> io.submit(() -> {
+            try {
+                if (imageReader == null) return;
+
+                mainHandler.post(() -> {
+                    if (bubble != null && !armed) bubble.setVisibility(View.INVISIBLE);
+                });
+                Thread.sleep(180);
+
+                Bitmap raw = acquireLatestBitmap();
+                if (raw == null) return;
+                Bitmap cropped = cropForAnalysis(raw);
+                Bitmap scaled = scaleForUpload(cropped, 720);
+
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                scaled.compress(Bitmap.CompressFormat.JPEG, 72, bos);
+
+                if (scaled != cropped) scaled.recycle();
+                if (cropped != raw) cropped.recycle();
+                raw.recycle();
+
+                postOutcomeSnapshot(bos.toByteArray(), analysisId, asset);
+            } catch (Exception ignored) {
+                // Learning feedback is best-effort and must never affect a live signal.
+            } finally {
+                mainHandler.post(() -> {
+                    if (bubble != null && !armed) bubble.setVisibility(View.VISIBLE);
+                });
+            }
+        }), delay);
+    }
+
+    private void postOutcomeSnapshot(byte[] frame, String analysisId, String asset) throws Exception {
+        String outcomeEndpoint = ENDPOINT.endsWith("/v1/mobile-scan")
+                ? ENDPOINT.substring(0, ENDPOINT.length() - "/v1/mobile-scan".length()) + "/v1/outcome-snapshot"
+                : ENDPOINT.replace("/mobile-scan", "/outcome-snapshot");
+
+        String boundary = "----TTLOutcome" + System.currentTimeMillis();
+        HttpURLConnection conn = (HttpURLConnection) new URL(outcomeEndpoint).openConnection();
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(30000);
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Accept", "application/json");
+        if (CLIENT_TOKEN != null && !CLIENT_TOKEN.isEmpty()) {
+            conn.setRequestProperty("X-TT-Client", CLIENT_TOKEN);
+        }
+        conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+        try (DataOutputStream out = new DataOutputStream(conn.getOutputStream())) {
+            writeField(out, boundary, "analysisId", analysisId);
+            writeField(out, boundary, "pair", asset == null ? "" : asset);
+
+            out.writeBytes("--" + boundary + "\r\n");
+            out.writeBytes("Content-Disposition: form-data; name=\"frame\"; filename=\"outcome.jpg\"\r\n");
+            out.writeBytes("Content-Type: image/jpeg\r\n\r\n");
+            out.write(frame);
+            out.writeBytes("\r\n");
+            out.writeBytes("--" + boundary + "--\r\n");
+            out.flush();
+        }
+
+        int code = conn.getResponseCode();
+        InputStream stream = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+        String body = readAll(stream);
+        if (code < 200 || code >= 300) {
+            throw new IOException("Outcome feedback HTTP " + code + ": " + body);
+        }
+    }
+
 
     private void writeField(DataOutputStream out, String boundary, String name, String value) throws IOException {
         out.writeBytes("--" + boundary + "\r\n");
