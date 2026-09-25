@@ -602,10 +602,31 @@ public class CaptureService extends Service {
                     if (!armed) return;
 
                     String message = e.getMessage() == null ? "unknown engine error" : e.getMessage();
-                    // No rolling retries. A backend full analysis already has one bounded
-                    // transient retry; late verification is one-shot by design.
+
+                    if ("full".equals(thisMode)) {
+                        // Do not finalize NO TRADE early. If the early/full cloud pass fails
+                        // but the target candle is still alive, keep the same locked target
+                        // and give T-12 one independent late verification chance.
+                        fullAnalysisDone = true;
+                        earlyDirection = "";
+                        long remainingMs = estimatedCloseEpochMs - System.currentTimeMillis();
+
+                        if (remainingMs > 7000L) {
+                            bubble.setVisibility(View.VISIBLE);
+                            bubble.setText("FULL UNCLEAR\nVERIFY T-12");
+                            bubble.setContentDescription(
+                                    "Early analysis unavailable. One late verification remains for the same target candle. " +
+                                            message
+                            );
+                            scheduleSingleVerification();
+                            return;
+                        }
+                    }
+
+                    // Late verification is one-shot. Missing that deadline means NO TRADE
+                    // for this target; never roll into the following candle.
                     finishNoTrade(
-                            ("full".equals(thisMode) ? "Full analysis failed: " : "Late verification failed: ")
+                            ("full".equals(thisMode) ? "Full analysis failed too late: " : "Late verification failed: ")
                                     + message
                     );
                 });

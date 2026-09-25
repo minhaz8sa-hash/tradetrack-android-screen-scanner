@@ -53,7 +53,13 @@ Rules:
 - support_distance_atr/resistance_distance_atr are approximate distances in units
   of recent average candle range; use null if not visually defensible.
 - Do not invent a pair, timer, support, resistance, or price not visible.
-- If uncertain use UNKNOWN/UNCLEAR/null and explain briefly in notes.
+- Treat metadata readability separately from chart readability: if pair/timer text is unreadable,
+  use UNKNOWN/null for only those fields, but still analyze visible candlestick trend, structure,
+  momentum, wicks, breakout/reversal behavior, support/resistance proximity, and instability.
+- Do NOT return all-neutral defaults merely because one UI label is unreadable.
+- Focus on the central candlestick chart. Ignore decorative UI, payout buttons, overlay bubbles,
+  and red zig-zag/trend-line drawings when determining candle structure.
+- If the candlesticks themselves are genuinely unreadable, use UNCLEAR and explain briefly in notes.
 - Current/running candle is evidence only; do not output an UP/DOWN trading signal.
 - Output JSON only, with no markdown.
 """.strip()
@@ -95,7 +101,11 @@ class OpenAIChartAnalyzer:
             }
         ]
         for frame in frames:
-            content.append({"type": "input_image", "image_url": _data_url(frame)})
+            content.append({
+                "type": "input_image",
+                "image_url": _data_url(frame),
+                "detail": "high",
+            })
 
         client = self.client or OpenAI()
         last_error: Exception | None = None
