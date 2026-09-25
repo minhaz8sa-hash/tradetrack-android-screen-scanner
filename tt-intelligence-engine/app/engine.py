@@ -137,8 +137,10 @@ class TTIntelligenceEngine:
             direction = "SKIP"
             state = "NO_TRADE"
         else:
-            late = f.seconds_to_close is not None and f.seconds_to_close <= 15.0
-            state = "LOCKED" if analysis_mode == "verify" and late else "CANDIDATE"
+            # The Android client schedules verify exactly inside the late window
+            # against a locally locked 1M target. Do not depend on vision/OCR timer
+            # extraction to decide whether a verification is late enough.
+            state = "LOCKED" if analysis_mode == "verify" else "CANDIDATE"
 
         target_open = None
         if f.seconds_to_close is not None:

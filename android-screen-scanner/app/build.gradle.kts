@@ -10,8 +10,8 @@ android {
         applicationId = "com.tradetracklive.scanner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "2.0.0-alpha1"
+        versionCode = 8
+        versionName = "2.0.0-alpha2-fast"
 
         val ttEngineEndpoint = providers.gradleProperty("TT_ENGINE_ENDPOINT")
             .orElse("")

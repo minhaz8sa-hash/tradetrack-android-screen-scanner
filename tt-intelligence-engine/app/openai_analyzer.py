@@ -98,24 +98,39 @@ class OpenAIChartAnalyzer:
             content.append({"type": "input_image", "image_url": _data_url(frame)})
 
         client = self.client or OpenAI()
-        response = client.responses.create(
-            model=self.model,
-            input=[{"role": "user", "content": content}],
+        last_error: Exception | None = None
+
+        # Structured Outputs removes the prompt-only JSON parsing failure mode that
+        # previously caused intermittent 502s. Retry at most once for transient
+        # network/model errors; the Android client has a hard candle deadline.
+        max_attempts = 2 if analysis_mode == "full" else 1
+        for attempt in range(max_attempts):
+            try:
+                response = client.responses.parse(
+                    model=self.model,
+                    input=[{"role": "user", "content": content}],
+                    text_format=SnapshotFeatures,
+                    timeout=9.0,
+                )
+                parsed = response.output_parsed
+                if parsed is None:
+                    raise ValueError("OpenAI returned no parsed SnapshotFeatures")
+
+                payload = parsed.model_dump()
+                if pair_hint and (not payload.get("pair") or payload.get("pair") in {"UNKNOWN", "—"}):
+                    payload["pair"] = pair_hint
+                payload["timeframe"] = timeframe or payload.get("timeframe", "1M")
+                if market_type != "UNKNOWN":
+                    payload["market_type"] = market_type
+                return SnapshotFeatures.model_validate(payload)
+            except Exception as exc:
+                last_error = exc
+                if attempt + 1 >= max_attempts:
+                    break
+
+        raise RuntimeError(
+            f"OpenAI snapshot extraction failed after {max_attempts} attempt(s): {last_error}"
         )
-
-        raw = response.output_text.strip()
-        if raw.startswith("```"):
-            raw = raw.strip("`")
-            if raw.startswith("json"):
-                raw = raw[4:].strip()
-
-        payload = json.loads(raw)
-        if pair_hint and (not payload.get("pair") or payload.get("pair") in {"UNKNOWN", "—"}):
-            payload["pair"] = pair_hint
-        payload["timeframe"] = timeframe or payload.get("timeframe", "1M")
-        if market_type != "UNKNOWN":
-            payload["market_type"] = market_type
-        return SnapshotFeatures.model_validate(payload)
 
 
 OUTCOME_PROMPT = """
