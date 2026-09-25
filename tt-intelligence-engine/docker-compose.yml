@@ -1,5 +1,6 @@
 services:
   tt-engine:
+    build: .
     image: ghcr.io/minhaz8sa-hash/tt-intelligence-engine:v2
     restart: unless-stopped
     expose:
