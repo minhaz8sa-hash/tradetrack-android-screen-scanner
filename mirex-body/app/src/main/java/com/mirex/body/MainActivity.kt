@@ -1,10 +1,14 @@
 package com.mirex.body
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -16,23 +20,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.mirex.body.accessibility.MirexAccessibilityService
 import com.mirex.body.agent.AgentBus
 import com.mirex.body.agent.ChatRole
 import com.mirex.body.data.SecureKeyStore
+import com.mirex.body.voice.VoiceControlService
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val secure = SecureKeyStore(this)
         setContent {
-            MirexTheme {
-                MirexScreen(
+            VeyraTheme {
+                VeyraScreen(
                     loadKey = secure::loadApiKey,
                     saveKey = secure::saveApiKey,
                     loadModel = secure::loadModel,
@@ -47,7 +54,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun MirexTheme(content: @Composable () -> Unit) {
+private fun VeyraTheme(content: @Composable () -> Unit) {
     val scheme = darkColorScheme(
         primary = Color(0xFF8AB4F8),
         background = Color(0xFF0D0F12),
@@ -60,22 +67,39 @@ private fun MirexTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun MirexScreen(
+private fun VeyraScreen(
     loadKey: () -> String,
     saveKey: (String) -> Unit,
     loadModel: () -> String,
     saveModel: (String) -> Unit,
     openAccessibility: () -> Unit
 ) {
+    val context = LocalContext.current
     val messages by AgentBus.messages.collectAsState()
     val status by AgentBus.status.collectAsState()
     val running by AgentBus.running.collectAsState()
     val connected by AgentBus.bodyConnected.collectAsState()
+    val callActive by VoiceControlService.active.collectAsState()
+    val callStatus by VoiceControlService.status.collectAsState()
+
     var task by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf(loadKey()) }
     var model by remember { mutableStateOf(loadModel()) }
     var showSetup by remember { mutableStateOf(apiKey.isBlank()) }
     val listState = rememberLazyListState()
+
+    fun startCallMode() {
+        ContextCompat.startForegroundService(
+            context,
+            Intent(context, VoiceControlService::class.java).setAction(VoiceControlService.ACTION_START)
+        )
+    }
+
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startCallMode()
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
@@ -91,11 +115,19 @@ private fun MirexScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("Mirex Body", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Text(status, fontSize = 12.sp, color = Color(0xFF9FA7B2))
+                        Text("Veyra", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (callActive) callStatus else status,
+                            fontSize = 12.sp,
+                            color = Color(0xFF9FA7B2)
+                        )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(if (connected) "BODY ON" else "BODY OFF", fontSize = 11.sp, color = if (connected) Color(0xFF80CBC4) else Color(0xFFFFAB91))
+                        Text(
+                            if (connected) "BODY ON" else "BODY OFF",
+                            fontSize = 11.sp,
+                            color = if (connected) Color(0xFF80CBC4) else Color(0xFFFFAB91)
+                        )
                         TextButton(onClick = { showSetup = !showSetup }) { Text("Setup") }
                     }
                 }
@@ -106,7 +138,7 @@ private fun MirexScreen(
             if (!connected) {
                 Surface(color = Color(0xFF2A2114), modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Accessibility body is disabled.", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                        Text("Veyra Accessibility is disabled.", modifier = Modifier.weight(1f), fontSize = 13.sp)
                         Button(onClick = openAccessibility) { Text("Enable") }
                     }
                 }
@@ -126,15 +158,54 @@ private fun MirexScreen(
                 )
             }
 
+            Surface(
+                color = if (callActive) Color(0xFF13352B) else Color(0xFF171B21),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            if (callActive) "Veyra Call is ON" else "Veyra Call",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            if (callActive) callStatus else "Talk continuously, like a voice assistant.",
+                            fontSize = 12.sp,
+                            color = Color(0xFFB8C0CA)
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            if (callActive) {
+                                context.stopService(Intent(context, VoiceControlService::class.java))
+                            } else {
+                                val granted = ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (granted) startCallMode()
+                                else micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        },
+                        colors = if (callActive) {
+                            ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E))
+                        } else ButtonDefaults.buttonColors()
+                    ) {
+                        Text(if (callActive) "End Call" else "Start Call")
+                    }
+                }
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (messages.isEmpty()) {
-                    item { WelcomeCard() }
-                }
+                if (messages.isEmpty()) item { WelcomeCard() }
                 items(messages) { msg ->
                     val isUser = msg.role is ChatRole.User
                     Row(
@@ -164,7 +235,7 @@ private fun MirexScreen(
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 1,
                         maxLines = 4,
-                        placeholder = { Text("Tell Mirex what to do on this phone…") }
+                        placeholder = { Text("Tell Veyra what to do on this phone…") }
                     )
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -227,7 +298,11 @@ private fun SetupPanel(
                 supportingText = { Text("Default: gpt-6-astra") },
                 singleLine = true
             )
-            Text("The key is encrypted with Android Keystore on this device. For a shared/public app, use a server-side key proxy instead.", fontSize = 11.sp, color = Color(0xFF9FA7B2))
+            Text(
+                "The key is encrypted with Android Keystore on this device.",
+                fontSize = 11.sp,
+                color = Color(0xFF9FA7B2)
+            )
             Button(onClick = onSave, modifier = Modifier.align(Alignment.End)) { Text("Save") }
         }
     }
@@ -237,9 +312,17 @@ private fun SetupPanel(
 private fun WelcomeCard() {
     Surface(shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Phone-control prototype", fontWeight = FontWeight.Bold)
-            Text("Try: “Open Chrome and search for Tiger71”, “Open CapCut”, or “Open Settings and show battery information.”", fontSize = 13.sp, color = Color(0xFFB8C0CA))
-            Text("A red MIREX STOP control appears while the agent is operating another app.", fontSize = 12.sp, color = Color(0xFF9FA7B2))
+            Text("Veyra phone agent", fontWeight = FontWeight.Bold)
+            Text(
+                "Start Call, then say: “Free Fire open করো”, “Chrome open করো”, or another phone command.",
+                fontSize = 13.sp,
+                color = Color(0xFFB8C0CA)
+            )
+            Text(
+                "Veyra speaks progress, completes the task, asks what to do next, then listens again.",
+                fontSize = 12.sp,
+                color = Color(0xFF9FA7B2)
+            )
         }
     }
 }
