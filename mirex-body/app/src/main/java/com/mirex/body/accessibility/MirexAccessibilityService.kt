@@ -269,7 +269,7 @@ class MirexAccessibilityService : AccessibilityService() {
         if (stopOverlay != null) return
         val wm = getSystemService(WINDOW_SERVICE) as WindowManager
         val view = TextView(this).apply {
-            text = "MIREX STOP"
+            text = "VEYRA STOP"
             textSize = 12f
             setTextColor(0xFFFFFFFF.toInt())
             setBackgroundColor(0xE6B3261E.toInt())
