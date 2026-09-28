@@ -9,7 +9,7 @@
 
     <application
         android:allowBackup="true"
-        android:label="Mirex Body"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.MirexBody">
 
@@ -38,6 +38,5 @@
             android:name=".voice.VoiceControlService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
-
     </application>
 </manifest>
