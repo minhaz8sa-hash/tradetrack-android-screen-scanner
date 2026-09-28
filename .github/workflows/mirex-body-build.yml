@@ -45,3 +45,5 @@ jobs:
           name: Mirex-Body-debug
           path: mirex-body/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+# rebuild marker: kotlin-stack-fix
