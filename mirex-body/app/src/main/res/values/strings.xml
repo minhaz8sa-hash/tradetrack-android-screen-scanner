@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Mirex Body</string>
+    <string name="accessibility_description">Lets Mirex Body observe the screen and perform user-authorized taps, swipes, and typing.</string>
+</resources>
