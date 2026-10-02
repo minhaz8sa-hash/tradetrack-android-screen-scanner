@@ -46,4 +46,4 @@ jobs:
           path: mirex-body/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# v0.3 cloud + local skills build
+# v0.3 final local + cloud + OCR build
