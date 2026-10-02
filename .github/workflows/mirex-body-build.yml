@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - mirex-body-v0.2-voice
+      - veyra-v0.3-cloud-local
     paths:
       - 'mirex-body/**'
       - '.github/workflows/mirex-body-build.yml'
@@ -42,8 +42,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Veyra-v0.2-debug
+          name: Veyra-v0.3-debug
           path: mirex-body/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# v0.2 voice call build
+# v0.3 cloud + local skills build
