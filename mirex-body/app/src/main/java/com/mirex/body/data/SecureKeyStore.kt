@@ -46,6 +46,12 @@ class SecureKeyStore(private val context: Context) {
 
     fun loadModel(): String = prefs.getString("model", "gpt-6-astra") ?: "gpt-6-astra"
 
+    fun saveAiFallback(enabled: Boolean) {
+        prefs.edit().putBoolean("ai_fallback", enabled).apply()
+    }
+
+    fun loadAiFallback(): Boolean = prefs.getBoolean("ai_fallback", false)
+
     private fun getOrCreateKey(): SecretKey {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (ks.getKey(alias, null) as? SecretKey)?.let { return it }
