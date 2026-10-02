@@ -21,6 +21,7 @@ class LocalSkillEngine(
         if (clean.isBlank()) return Result(false)
 
         nativeNavigation(clean)?.let { return it }
+        nativeWebSearch(clean)?.let { return it }
         nativeUrl(clean)?.let { return it }
         nativeClick(clean)?.let { return it }
         nativeType(clean)?.let { return it }
@@ -53,6 +54,24 @@ class LocalSkillEngine(
 
             else -> null
         }
+    }
+
+    private fun nativeWebSearch(command: String): Result? {
+        val raw = command.trim()
+        val patterns = listOf(
+            Regex("(?is)^(?:chrome|google|browser)?\\s*(?:e|এ)?\\s*(?:search|সার্চ)\\s+(?:for\\s+)?(.+?)\\s*(?:koro|করো)?$"),
+            Regex("(?is)^(.+?)\\s+(?:search|সার্চ)\\s+(?:koro|করো)$")
+        )
+        var query = patterns.firstNotNullOfOrNull { it.find(raw)?.groupValues?.getOrNull(1) }?.trim()
+            ?: return null
+        query = query
+            .replace(Regex("(?i)^(chrome|google|browser)\\s+(e|এ)\\s+"), "")
+            .trim()
+        if (query.length < 2) return null
+
+        val url = "https://www.google.com/search?q=" + android.net.Uri.encode(query)
+        val ok = phone.openUrl(url)
+        return Result(true, ok, if (ok) query + " search করছি।" else "Browser search খুলতে পারিনি।")
     }
 
     private fun nativeUrl(command: String): Result? {
@@ -219,8 +238,12 @@ class LocalSkillEngine(
 
         var value = patterns.firstNotNullOfOrNull { it.find(raw)?.groupValues?.getOrNull(1) } ?: return null
         value = value
+            .replace(Regex("(?i)^(amar|my)\\s+"), "")
+            .replace(Regex("^আমার\\s+"), "")
             .replace(Regex("(?i)\\b(app|application)\\b"), " ")
-            .replace(Regex("(?i)\\b(koro|please|plz)\\b"), " ")
+            .replace(Regex("(?i)\\b(koro|please|plz|ta)\\b"), " ")
+            .replace("টা", " ")
+            .replace("টি", " ")
             .replace("করো", " ")
             .replace("করে দাও", " ")
             .trim()
