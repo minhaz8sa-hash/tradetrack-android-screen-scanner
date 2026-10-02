@@ -21,6 +21,9 @@ object AgentBus {
     private val _bodyConnected = MutableStateFlow(false)
     val bodyConnected = _bodyConnected.asStateFlow()
 
+    private val _cloudStatus = MutableStateFlow("Cloud not synced")
+    val cloudStatus = _cloudStatus.asStateFlow()
+
     private val _voiceEvents = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val voiceEvents = _voiceEvents.asSharedFlow()
 
@@ -28,6 +31,7 @@ object AgentBus {
     fun status(value: String) { _status.value = value }
     fun running(value: Boolean) { _running.value = value }
     fun bodyConnected(value: Boolean) { _bodyConnected.value = value }
+    fun cloudStatus(value: String) { _cloudStatus.value = value }
 
     fun speak(text: String) {
         val clean = text.trim()
