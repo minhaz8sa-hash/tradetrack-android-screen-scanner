@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -22,6 +23,9 @@ import com.mirex.body.agent.ChatRole
 import com.mirex.body.cloud.CloudSkillStore
 import com.mirex.body.cloud.VeyraCloudClient
 import com.mirex.body.skills.LocalSkillEngine
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -186,6 +190,62 @@ class MirexAccessibilityService : AccessibilityService() {
             }
             ?: return false
         return clickNodeOrParent(node)
+    }
+
+    suspend fun clickTextSmart(query: String): Boolean {
+        if (clickText(query)) return true
+        val bounds = findTextBoundsByOcr(query) ?: return false
+        return tap(bounds.exactCenterX(), bounds.exactCenterY())
+    }
+
+    private suspend fun findTextBoundsByOcr(query: String): Rect? {
+        val q = query.trim()
+        if (q.isBlank()) return null
+        val frame = screenshot() ?: return null
+        val bytes = runCatching {
+            android.util.Base64.decode(frame.base64Jpeg, android.util.Base64.NO_WRAP)
+        }.getOrNull() ?: return null
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val image = InputImage.fromBitmap(bitmap, 0)
+
+        return suspendCancellableCoroutine { cont ->
+            recognizer.process(image)
+                .addOnSuccessListener { result ->
+                    var partial: Rect? = null
+                    var exact: Rect? = null
+
+                    outer@ for (block in result.textBlocks) {
+                        for (line in block.lines) {
+                            if (line.text.equals(q, ignoreCase = true)) {
+                                exact = line.boundingBox
+                                break@outer
+                            }
+                            if (partial == null && line.text.contains(q, ignoreCase = true)) {
+                                partial = line.boundingBox
+                            }
+                            for (element in line.elements) {
+                                if (element.text.equals(q, ignoreCase = true)) {
+                                    exact = element.boundingBox
+                                    break@outer
+                                }
+                                if (partial == null && element.text.contains(q, ignoreCase = true)) {
+                                    partial = element.boundingBox
+                                }
+                            }
+                        }
+                    }
+
+                    if (cont.isActive) cont.resume(exact ?: partial)
+                }
+                .addOnFailureListener {
+                    if (cont.isActive) cont.resume(null)
+                }
+                .addOnCompleteListener {
+                    bitmap.recycle()
+                    recognizer.close()
+                }
+        }
     }
 
     fun scroll(direction: String): Boolean {
