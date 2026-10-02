@@ -239,16 +239,11 @@ class VoiceControlService : Service(), RecognitionListener {
         val secure = SecureKeyStore(this)
         val key = secure.loadApiKey()
         val model = secure.loadModel().ifBlank { "gpt-6-astra" }
-
-        if (key.isBlank()) {
-            AgentBus.add(ChatMessage(ChatRole.System, "Voice command heard: $command\nOpenAI API key is missing."))
-            AgentBus.speak("OpenAI API key পাওয়া যায়নি। Veyra Setup থেকে key দিন।")
-            return
-        }
+        val allowAiFallback = secure.loadAiFallback()
 
         status.value = "Command: $command"
         updateNotification("Executing: ${command.take(42)}")
-        body.startAgentTask(command, key, model)
+        body.startSmartTask(command, key, model, allowAiFallback)
     }
 
     private fun createNotificationChannel() {
