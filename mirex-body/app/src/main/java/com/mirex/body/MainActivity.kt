@@ -30,6 +30,7 @@ import androidx.core.content.ContextCompat
 import com.mirex.body.accessibility.MirexAccessibilityService
 import com.mirex.body.agent.AgentBus
 import com.mirex.body.agent.ChatRole
+import com.mirex.body.cloud.VeyraCloudClient
 import com.mirex.body.data.SecureKeyStore
 import com.mirex.body.voice.VoiceControlService
 
@@ -44,6 +45,8 @@ class MainActivity : ComponentActivity() {
                     saveKey = secure::saveApiKey,
                     loadModel = secure::loadModel,
                     saveModel = secure::saveModel,
+                    loadAiFallback = secure::loadAiFallback,
+                    saveAiFallback = secure::saveAiFallback,
                     openAccessibility = {
                         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     }
@@ -72,6 +75,8 @@ private fun VeyraScreen(
     saveKey: (String) -> Unit,
     loadModel: () -> String,
     saveModel: (String) -> Unit,
+    loadAiFallback: () -> Boolean,
+    saveAiFallback: (Boolean) -> Unit,
     openAccessibility: () -> Unit
 ) {
     val context = LocalContext.current
@@ -79,13 +84,15 @@ private fun VeyraScreen(
     val status by AgentBus.status.collectAsState()
     val running by AgentBus.running.collectAsState()
     val connected by AgentBus.bodyConnected.collectAsState()
+    val cloudStatus by AgentBus.cloudStatus.collectAsState()
     val callActive by VoiceControlService.active.collectAsState()
     val callStatus by VoiceControlService.status.collectAsState()
 
     var task by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf(loadKey()) }
     var model by remember { mutableStateOf(loadModel()) }
-    var showSetup by remember { mutableStateOf(apiKey.isBlank()) }
+    var aiFallback by remember { mutableStateOf(loadAiFallback()) }
+    var showSetup by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     fun startCallMode() {
@@ -99,6 +106,10 @@ private fun VeyraScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) startCallMode()
+    }
+
+    LaunchedEffect(Unit) {
+        VeyraCloudClient(context).syncSkills(force = false)
     }
 
     LaunchedEffect(messages.size) {
@@ -121,6 +132,7 @@ private fun VeyraScreen(
                             fontSize = 12.sp,
                             color = Color(0xFF9FA7B2)
                         )
+                        Text(cloudStatus, fontSize = 10.sp, color = Color(0xFF7F8A99))
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -150,9 +162,12 @@ private fun VeyraScreen(
                     onApiKey = { apiKey = it },
                     model = model,
                     onModel = { model = it },
+                    aiFallback = aiFallback,
+                    onAiFallback = { aiFallback = it },
                     onSave = {
                         saveKey(apiKey.trim())
                         saveModel(model.trim())
+                        saveAiFallback(aiFallback)
                         showSetup = false
                     }
                 )
@@ -250,16 +265,20 @@ private fun VeyraScreen(
                                 onClick = {
                                     val service = MirexAccessibilityService.instance
                                     val cleanTask = task.trim()
-                                    if (service != null && cleanTask.isNotEmpty() && apiKey.isNotBlank()) {
+                                    if (service != null && cleanTask.isNotEmpty()) {
                                         saveKey(apiKey.trim())
                                         saveModel(model.trim())
+                                        saveAiFallback(aiFallback)
                                         task = ""
-                                        service.startAgentTask(cleanTask, apiKey.trim(), model.trim().ifBlank { "gpt-6-astra" })
-                                    } else if (apiKey.isBlank()) {
-                                        showSetup = true
+                                        service.startSmartTask(
+                                            cleanTask,
+                                            apiKey.trim(),
+                                            model.trim().ifBlank { "gpt-6-astra" },
+                                            aiFallback
+                                        )
                                     }
                                 },
-                                enabled = connected && task.isNotBlank() && apiKey.isNotBlank(),
+                                enabled = connected && task.isNotBlank(),
                                 modifier = Modifier.weight(1f)
                             ) { Text("Run on phone") }
                         }
@@ -276,6 +295,8 @@ private fun SetupPanel(
     onApiKey: (String) -> Unit,
     model: String,
     onModel: (String) -> Unit,
+    aiFallback: Boolean,
+    onAiFallback: (Boolean) -> Unit,
     onSave: () -> Unit
 ) {
     Surface(color = Color(0xFF171B21), modifier = Modifier.fillMaxWidth()) {
@@ -285,7 +306,7 @@ private fun SetupPanel(
                 value = apiKey,
                 onValueChange = onApiKey,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("OpenAI API key") },
+                label = { Text("OpenAI API key (optional)") },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true
@@ -298,8 +319,23 @@ private fun SetupPanel(
                 supportingText = { Text("Default: gpt-6-astra") },
                 singleLine = true
             )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("AI fallback", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "OFF = local/cloud skills only. ON = use Astra only when no local skill can handle the command.",
+                        fontSize = 11.sp,
+                        color = Color(0xFF9FA7B2)
+                    )
+                }
+                Switch(checked = aiFallback, onCheckedChange = onAiFallback)
+            }
             Text(
-                "The key is encrypted with Android Keystore on this device.",
+                "OpenAI is optional. The key is encrypted with Android Keystore when you save one.",
                 fontSize = 11.sp,
                 color = Color(0xFF9FA7B2)
             )
