@@ -61,7 +61,7 @@ class LocalSkillEngine(
         return Result(true, ok, if (ok) "Website খুলছি।" else "Website খুলতে পারিনি।")
     }
 
-    private fun nativeClick(command: String): Result? {
+    private suspend fun nativeClick(command: String): Result? {
         val c = command.trim()
         val marker = Regex("(?i)(click|tap|ক্লিক|চাপ)")
         val m = marker.find(c) ?: return null
@@ -80,7 +80,7 @@ class LocalSkillEngine(
             .trim()
         if (target.isBlank()) return null
 
-        val ok = phone.clickText(target)
+        val ok = phone.clickTextSmart(target)
         return Result(true, ok, if (ok) target + " চাপেছি।" else target + " screen-এ পাইনি।")
     }
 
@@ -150,7 +150,7 @@ class LocalSkillEngine(
             val ok = when (action.optString("op")) {
                 "open_app" -> phone.openApp(action.optString("value"))
                 "open_url" -> phone.openUrl(action.optString("value"))
-                "click_text" -> phone.clickText(action.optString("value"))
+                "click_text" -> phone.clickTextSmart(action.optString("value"))
                 "click_text_any" -> clickAny(action.optJSONArray("values"))
                 "type_text" -> phone.typeText(action.optString("value"))
                 "scroll" -> phone.scroll(action.optString("direction", "forward"))
@@ -174,19 +174,19 @@ class LocalSkillEngine(
         return Result(true, true, name + " skill complete হয়েছে।")
     }
 
-    private fun clickAny(values: JSONArray?): Boolean {
+    private suspend fun clickAny(values: JSONArray?): Boolean {
         if (values == null) return false
         for (i in 0 until values.length()) {
             val value = values.optString(i)
-            if (value.isNotBlank() && phone.clickText(value)) return true
+            if (value.isNotBlank() && phone.clickTextSmart(value)) return true
         }
         return false
     }
 
-    private fun handleModal(): Result {
+    private suspend fun handleModal(): Result {
         val candidates = listOf("Close", "CLOSE", "Cancel", "CANCEL", "Later", "LATER", "Not now", "OK", "Got it")
         for (candidate in candidates) {
-            if (phone.clickText(candidate)) {
+            if (phone.clickTextSmart(candidate)) {
                 return Result(true, true, "Popup বন্ধ করেছি।")
             }
         }
