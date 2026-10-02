@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.net.Uri
 import android.os.Bundle
 import android.view.Display
 import android.view.Gravity
@@ -18,6 +19,9 @@ import com.mirex.body.agent.AgentBus
 import com.mirex.body.agent.AgentRunner
 import com.mirex.body.agent.ChatMessage
 import com.mirex.body.agent.ChatRole
+import com.mirex.body.cloud.CloudSkillStore
+import com.mirex.body.cloud.VeyraCloudClient
+import com.mirex.body.skills.LocalSkillEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,14 +67,52 @@ class MirexAccessibilityService : AccessibilityService() {
     }
 
     fun startAgentTask(task: String, apiKey: String, model: String) {
+        startSmartTask(task, apiKey, model, allowAiFallback = true)
+    }
+
+    fun startSmartTask(
+        task: String,
+        apiKey: String,
+        model: String,
+        allowAiFallback: Boolean
+    ) {
         if (taskJob?.isActive == true) return
         AgentBus.add(ChatMessage(ChatRole.User, task))
         AgentBus.running(true)
-        AgentBus.status("Starting…")
+        AgentBus.status("Local check…")
         showStopOverlay()
+
         taskJob = serviceScope.launch(Dispatchers.IO) {
             try {
-                AgentRunner(this@MirexAccessibilityService, apiKey, model).run(task)
+                val store = CloudSkillStore(this@MirexAccessibilityService)
+                VeyraCloudClient(this@MirexAccessibilityService).syncSkills(force = false)
+
+                val local = LocalSkillEngine(this@MirexAccessibilityService, store).execute(task)
+                if (local.handled) {
+                    val reply = local.message.ifBlank {
+                        if (local.success) "Local task complete হয়েছে।" else "Local task complete করা যায়নি।"
+                    }
+                    AgentBus.add(ChatMessage(ChatRole.Assistant, reply))
+                    AgentBus.status(if (local.success) "Done · Local" else "Local blocked")
+                    AgentBus.speak(reply)
+                    if (local.success) AgentBus.speak("টাস্ক কমপ্লিট। আর কিছু করতে হবে?")
+                    return@launch
+                }
+
+                if (allowAiFallback && apiKey.isNotBlank()) {
+                    AgentBus.status("AI fallback…")
+                    AgentRunner(this@MirexAccessibilityService, apiKey, model).run(task)
+                } else {
+                    val reply = if (allowAiFallback && apiKey.isBlank()) {
+                        "এই command-এর local skill এখনো নেই। AI fallback চালাতে API key লাগবে।"
+                    } else {
+                        "এই command-এর local skill এখনো নেই। Veyra Cloud-এ skill add করলে OpenAI ছাড়াই চালানো যাবে।"
+                    }
+                    AgentBus.add(ChatMessage(ChatRole.Assistant, reply))
+                    AgentBus.status("Local skill needed")
+                    AgentBus.speak(reply)
+                    AgentBus.speak("আর কিছু করতে হবে?")
+                }
             } catch (t: Throwable) {
                 AgentBus.add(ChatMessage(ChatRole.System, "Stopped: ${t.message ?: t.javaClass.simpleName}"))
                 AgentBus.status("Stopped")
@@ -185,6 +227,21 @@ class MirexAccessibilityService : AccessibilityService() {
         if (root == null) return null
         root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)?.let { if (it.isEditable) return it }
         return breadthFirst(root).firstOrNull { it.isFocused && it.isEditable }
+    }
+
+    fun openUrl(url: String): Boolean {
+        val normalized = if (url.startsWith("http://", true) || url.startsWith("https://", true)) {
+            url
+        } else {
+            "https://" + url
+        }
+        return runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(normalized)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            true
+        }.getOrDefault(false)
     }
 
     fun openApp(appNameOrPackage: String): Boolean {
