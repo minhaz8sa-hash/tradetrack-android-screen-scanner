@@ -1,20 +1,19 @@
-name: Build Android Scanner APK
+name: Build BNB PAY APK
 
 on:
   workflow_dispatch:
   push:
+    branches: [bnb-pay-v1]
     paths:
-      - "android-screen-scanner/**"
-  pull_request:
-    paths:
-      - "android-screen-scanner/**"
+      - "bnb-pay-apk/**"
+      - ".github/workflows/build-apk.yml"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: android-screen-scanner
+        working-directory: bnb-pay-apk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +38,6 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TradeTrack-Android-Screen-Scanner
-          path: android-screen-scanner/app/build/outputs/apk/debug/app-debug.apk
+          name: BNB-PAY-APK
+          path: bnb-pay-apk/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
