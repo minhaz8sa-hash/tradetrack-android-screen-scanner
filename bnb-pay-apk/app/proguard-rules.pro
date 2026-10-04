@@ -1,0 +1,1 @@
+# BNB PAY demo app
