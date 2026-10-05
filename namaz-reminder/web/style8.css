@@ -1,0 +1,50 @@
+/* Namaz Orbit core APK UI — smooth glass without expensive live blur */
+:root{--core-glass:linear-gradient(145deg,rgba(20,52,43,.92),rgba(8,29,24,.96));--core-border:rgba(158,240,213,.15)}
+.nav{grid-template-columns:repeat(4,1fr)!important}
+.core-card-v15{
+  position:relative;
+  margin:12px 0;
+  padding:14px;
+  border-radius:22px;
+  border:1px solid var(--core-border);
+  background:var(--core-glass);
+  box-shadow:inset 0 1px rgba(255,255,255,.045),0 10px 28px rgba(0,0,0,.22);
+  overflow:hidden;
+  content-visibility:auto;
+  contain-intrinsic-size:180px;
+}
+.core-card-v15:before{
+  content:"";position:absolute;left:12px;right:12px;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(185,255,232,.26),transparent);
+}
+.core-head-v15{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px}
+.core-head-v15 h3{margin:0;font-size:15px}.core-head-v15 small{color:var(--muted);font-size:9px}
+.core-status-v15{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;border:1px solid rgba(142,240,207,.14);background:rgba(142,240,207,.055);font-size:9px;color:var(--accent)}
+.core-status-v15 .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px rgba(142,240,207,.6)}
+.core-location-grid-v15{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center}
+.core-location-icon-v15{width:38px;height:38px;border-radius:13px;display:grid;place-items:center;border:1px solid rgba(142,240,207,.16);background:rgba(142,240,207,.06)}
+.core-location-icon-v15 svg{width:21px;height:21px;stroke:var(--accent);fill:none;stroke-width:1.8}
+.core-location-copy-v15{min-width:0}.core-location-copy-v15 b{display:block;font-size:12px}.core-location-copy-v15 span{display:block;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.core-location-meta-v15{text-align:right;font-size:9px;color:var(--muted)}.core-location-meta-v15 b{display:block;color:var(--accent);font-size:10px}
+.core-alarm-grid-v15{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.core-alarm-title-v15{font-size:13px;font-weight:750}.core-alarm-sub-v15{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.45}
+.core-alarm-actions-v15{display:flex;gap:7px}.core-mini-btn-v15{border:1px solid rgba(142,240,207,.16);background:rgba(142,240,207,.06);color:var(--accent);border-radius:11px;padding:8px 10px;font-size:10px}
+#corePrayerPanelV15 .prayer-list{display:grid;gap:8px}
+#corePrayerPanelV15 .prayer-card{margin:0!important;background:rgba(255,255,255,.025)!important;box-shadow:none!important}
+#homeCalendarV14{content-visibility:auto;contain-intrinsic-size:600px}
+#homeCalendarV14 .panel{background:var(--core-glass)!important;border-color:var(--core-border)!important}
+#compactLocationV14{display:none!important}
+#orbitTapHintV14{margin-top:-8px}
+html.native-perf .core-card-v15,
+html.native-perf #homeCalendarV14 .panel{
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+}
+#page-home .orbits{contain:layout paint style!important}
+#page-home .orbit-core{background:linear-gradient(145deg,rgba(13,43,35,.98),rgba(5,22,18,.99))!important}
+@media(max-width:390px){
+  .core-card-v15{padding:12px;border-radius:19px}
+  .core-location-grid-v15{grid-template-columns:34px 1fr auto}
+  .core-location-icon-v15{width:34px;height:34px}
+  .core-alarm-grid-v15{grid-template-columns:1fr}
+  .core-alarm-actions-v15{justify-content:flex-start}
+}
