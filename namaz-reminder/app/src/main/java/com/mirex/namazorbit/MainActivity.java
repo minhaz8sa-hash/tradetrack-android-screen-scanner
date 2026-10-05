@@ -193,6 +193,13 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
         @JavascriptInterface
+        public boolean hasExactAlarmAccess() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true;
+            AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            return am != null && am.canScheduleExactAlarms();
+        }
+
+        @JavascriptInterface
         public void requestExactAlarmPermission() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
