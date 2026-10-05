@@ -1,0 +1,59 @@
+/* Namaz Orbit v1.4.2 performance profile for Android WebView */
+html.native-perf body:before{display:none!important}
+html.native-perf body{background:#071510!important;overscroll-behavior-y:none}
+html.native-perf .glass,
+html.native-perf .pill{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  background:rgba(10,31,25,.95)!important;
+  box-shadow:0 5px 16px rgba(0,0,0,.20)!important
+}
+html.native-perf .nav{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  background:#071c16!important;
+  box-shadow:0 -5px 18px rgba(0,0,0,.28)!important;
+  transform:translate3d(-50%,0,0);
+  will-change:transform;
+  contain:layout paint style
+}
+html.native-perf .orbit,
+html.native-perf .orbit .picon,
+html.native-perf .qbadge{
+  animation:none!important
+}
+html.native-perf .orbits{
+  contain:layout paint style
+}
+html.native-perf .qibla-v13 .needle{
+  transition:transform .08s linear!important;
+  will-change:transform
+}
+html.native-perf .qibla-v13 .needle,
+html.native-perf .orbit .picon,
+html.native-perf .prayer-card.current-prayer{
+  filter:none!important
+}
+html.native-perf .orbit-core,
+html.native-perf .orbit .picon,
+html.native-perf .prayer-card,
+html.native-perf .panel,
+html.native-perf .compact-location-v14{
+  box-shadow:none!important
+}
+html.native-perf .prayer-card,
+html.native-perf .qaza-item,
+html.native-perf .event-card,
+html.native-perf .ayah{
+  contain:layout paint style
+}
+html.native-perf .surah-list,
+html.native-perf .sheet{
+  -webkit-overflow-scrolling:touch
+}
+html.native-perf button{
+  -webkit-tap-highlight-color:transparent
+}
+html.native-perf *{
+  scroll-behavior:auto
+}
