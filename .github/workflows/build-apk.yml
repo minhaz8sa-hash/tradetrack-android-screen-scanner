@@ -2,12 +2,20 @@ name: Build Android Scanner APK
 
 on:
   workflow_dispatch:
+    inputs:
+      engine_endpoint:
+        description: "TT Engine mobile-scan URL, e.g. https://engine.example.com/v1/mobile-scan"
+        required: false
+        type: string
   push:
+    branches: [tt-scan-v2-engine]
     paths:
       - "android-screen-scanner/**"
+      - ".github/workflows/build-apk.yml"
   pull_request:
     paths:
       - "android-screen-scanner/**"
+      - ".github/workflows/build-apk.yml"
 
 jobs:
   build:
@@ -20,13 +28,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found under $ANDROID_HOME"
+            find "$ANDROID_HOME" -maxdepth 4 -type f -name sdkmanager -print || true
+            exit 1
+          fi
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -34,11 +56,28 @@ jobs:
           gradle-version: "8.9"
 
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        shell: bash
+        run: |
+          ENDPOINT="${{ inputs.engine_endpoint }}"
+          if [ -z "$ENDPOINT" ]; then
+            ENDPOINT="${{ vars.TT_ENGINE_ENDPOINT }}"
+          fi
+          if [ -z "$ENDPOINT" ]; then
+            ENDPOINT="https://previously-rca-supplemental-restrict.trycloudflare.com/v1/mobile-scan"
+          fi
+          CLIENT_TOKEN="${{ secrets.TT_CLIENT_TOKEN }}"
+          echo "Building TT SCAN v2 (endpoint configured: $([ -n "$ENDPOINT" ] && echo yes || echo no), token configured: $([ -n "$CLIENT_TOKEN" ] && echo yes || echo no))"
+          if [ -z "$ENDPOINT" ] || [ -z "$CLIENT_TOKEN" ]; then
+            echo "Required TT build configuration is missing."
+            exit 1
+          fi
+          gradle :app:assembleDebug --stacktrace \
+            -PTT_ENGINE_ENDPOINT="$ENDPOINT" \
+            -PTT_CLIENT_TOKEN="$CLIENT_TOKEN"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TradeTrack-Android-Screen-Scanner
+          name: TradeTrack-TT-SCAN-v2
           path: android-screen-scanner/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

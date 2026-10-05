@@ -1,0 +1,28 @@
+name: TT Engine CI
+
+on:
+  push:
+    branches: [tt-scan-v2-engine]
+    paths:
+      - "tt-intelligence-engine/**"
+      - ".github/workflows/tt-engine-ci.yml"
+  pull_request:
+    paths:
+      - "tt-intelligence-engine/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tt-intelligence-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt
+      - run: python -m compileall -q app tests
+      - run: PYTHONPATH=. python -c "import app.main; print(app.main.app.title)"
+      - run: PYTHONPATH=. pytest -q

@@ -10,7 +10,20 @@ android {
         applicationId = "com.tradetracklive.scanner"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.4.1"
+        versionCode = 9
+        versionName = "2.0.0-alpha3-vision"
+
+        val ttEngineEndpoint = providers.gradleProperty("TT_ENGINE_ENDPOINT")
+            .orElse("")
+            .get()
+        val ttClientToken = providers.gradleProperty("TT_CLIENT_TOKEN")
+            .orElse("")
+            .get()
+        buildConfigField("String", "TT_ENGINE_ENDPOINT", "\"${ttEngineEndpoint}\"")
+        buildConfigField("String", "TT_CLIENT_TOKEN", "\"${ttClientToken}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 }

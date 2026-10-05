@@ -1,0 +1,36 @@
+services:
+  tt-engine:
+    build: .
+    image: ghcr.io/minhaz8sa-hash/tt-intelligence-engine:v2
+    restart: unless-stopped
+    expose:
+      - "8080"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-5.6-luna}
+      TT_CLIENT_TOKEN: ${TT_CLIENT_TOKEN:-}
+      TT_DB_PATH: /app/data/tt_intelligence.db
+      TT_MIN_PATTERN_SIMILARITY: ${TT_MIN_PATTERN_SIMILARITY:-0.82}
+      TT_MIN_DIRECTION_EDGE: ${TT_MIN_DIRECTION_EDGE:-0.15}
+    volumes:
+      - tt-engine-data:/app/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - tt-engine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TT_ENGINE_DOMAIN: ${TT_ENGINE_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  tt-engine-data:
+  caddy-data:
+  caddy-config:

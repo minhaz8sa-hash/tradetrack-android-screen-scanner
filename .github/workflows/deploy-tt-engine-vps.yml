@@ -1,0 +1,76 @@
+name: Deploy TT Engine to VPS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TT_CLIENT_TOKEN: ${{ secrets.TT_CLIENT_TOKEN }}
+          TT_ENGINE_DOMAIN: ${{ secrets.TT_ENGINE_DOMAIN }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          envs: OPENAI_API_KEY,TT_CLIENT_TOKEN,TT_ENGINE_DOMAIN
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            if ! command -v docker >/dev/null 2>&1; then
+              curl -fsSL https://get.docker.com | sh
+            fi
+
+            if ! docker compose version >/dev/null 2>&1; then
+              echo "Docker Compose plugin is required"
+              exit 1
+            fi
+
+            sudo mkdir -p /opt/tt-scan
+            sudo chown "$USER":"$USER" /opt/tt-scan
+
+            if [ ! -d /opt/tt-scan/.git ]; then
+              git clone --branch tt-scan-v2-engine --single-branch \
+                https://github.com/minhaz8sa-hash/tradetrack-android-screen-scanner.git \
+                /opt/tt-scan
+            else
+              git -C /opt/tt-scan fetch origin tt-scan-v2-engine
+              git -C /opt/tt-scan reset --hard origin/tt-scan-v2-engine
+            fi
+
+            cd /opt/tt-scan/tt-intelligence-engine
+
+            umask 077
+            cat > .env <<EOF
+            OPENAI_API_KEY=${OPENAI_API_KEY}
+            TT_CLIENT_TOKEN=${TT_CLIENT_TOKEN}
+            TT_ENGINE_DOMAIN=${TT_ENGINE_DOMAIN}
+            OPENAI_VISION_MODEL=gpt-5.6-luna
+            TT_DB_PATH=/app/data/tt_intelligence.db
+            TT_MIN_PATTERN_SIMILARITY=0.82
+            TT_MIN_DIRECTION_EDGE=0.15
+            EOF
+
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+
+            for i in $(seq 1 30); do
+              if curl -fsS "https://${TT_ENGINE_DOMAIN}/health" >/tmp/tt-health.json 2>/dev/null; then
+                cat /tmp/tt-health.json
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "Health check did not become ready"
+            docker compose logs --tail=120
+            exit 1
