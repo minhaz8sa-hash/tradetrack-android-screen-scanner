@@ -23,7 +23,8 @@ jobs:
         shell: bash
         run: |
           base64 -d namaz-reminder/update_payload.b64 > /tmp/namaz-update.tar.gz
-          sha256sum /tmp/namaz-update.tar.gz\n          tar -tzf /tmp/namaz-update.tar.gz >/dev/null
+          sha256sum /tmp/namaz-update.tar.gz
+          tar -tzf /tmp/namaz-update.tar.gz >/dev/null
           tar -xzf /tmp/namaz-update.tar.gz -C .
           rm namaz-reminder/update_payload.b64
 
