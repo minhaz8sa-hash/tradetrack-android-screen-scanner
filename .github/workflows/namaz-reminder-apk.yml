@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v1.5.3 JavaScript syntax
+      - name: Check v1.5.4 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -63,13 +63,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.5.3.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.5.4.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.5.3
-          path: namaz-reminder/Namaz-Orbit-v1.5.3.apk
+          name: Namaz-Orbit-v1.5.4
+          path: namaz-reminder/Namaz-Orbit-v1.5.4.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -78,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.5.3 --yes || true
-          git tag -d v1.5.3 2>/dev/null || true
-          git push origin :refs/tags/v1.5.3 2>/dev/null || true
-          gh release create v1.5.3 Namaz-Orbit-v1.5.3.apk --target main --title "Namaz Orbit v1.5.3" --notes "Fixes: prayer and Qaza orbit icons stay inside their circle while rotating; Namaz Guide now includes Surah/recitation guidance per prayer with recommended versus non-mandatory recitations clearly separated. Previous Qibla, vibration, grid background and performance fixes remain."
+          gh release delete v1.5.4 --yes || true
+          git tag -d v1.5.4 2>/dev/null || true
+          git push origin :refs/tags/v1.5.4 2>/dev/null || true
+          gh release create v1.5.4 Namaz-Orbit-v1.5.4.apk --target main --title "Namaz Orbit v1.5.4" --notes "Based on stable v1.5.2 behavior. Reverts v1.5.3 orbit/Guide changes and only adds crystal-clear glass backgrounds to Next Prayer and Live Location modules. Qibla, vibration, grid and performance fixes from v1.5.2 are retained."
