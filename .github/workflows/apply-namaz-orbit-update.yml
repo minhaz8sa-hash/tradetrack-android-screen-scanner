@@ -1,0 +1,81 @@
+name: Apply Namaz Orbit v1.1.0
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'namaz-reminder/update_payload.b64'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified v1.1.0 source payload
+        shell: bash
+        run: |
+          base64 -d namaz-reminder/update_payload.b64 > /tmp/namaz-update.tar.gz
+          echo "b2c5f8f71263c40ef63a92b36e083c551c007b6e0c50d8bb55e2dae0705d5a34  /tmp/namaz-update.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/namaz-update.tar.gz -C .
+          rm namaz-reminder/update_payload.b64
+
+      - name: Commit source update
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add namaz-reminder
+          git commit -m "Namaz Orbit v1.1.0 feature update"
+          git push origin HEAD:main
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        shell: bash
+        run: |
+          cd namaz-reminder
+          gradle :app:assembleDebug --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk ../Namaz-Orbit-v1.1.0.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Namaz-Orbit-v1.1.0
+          path: Namaz-Orbit-v1.1.0.apk
+          retention-days: 30
+
+      - name: Publish APK release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release delete v1.1.0 --yes || true
+          git tag -d v1.1.0 2>/dev/null || true
+          git push origin :refs/tags/v1.1.0 2>/dev/null || true
+          gh release create v1.1.0 Namaz-Orbit-v1.1.0.apk --target main --title "Namaz Orbit v1.1.0" --notes "Test alarm + vibration, Bangla Quran pronunciation aid, prayer end countdown/reminders, serial Qaza suggestions, redesigned prayer icons/current-prayer glow, and live Qibla compass."
