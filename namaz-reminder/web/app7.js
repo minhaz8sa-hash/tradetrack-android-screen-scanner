@@ -151,7 +151,6 @@ function scheduleAlarmsV13(force){
   if(!force&&sig===v13AlarmScheduleSignature)return;
   v13AlarmScheduleSignature=sig;
   var sound=settings.alarmSound||'alarm',pre=Number(settings.preReminder)||0,vibrate=settings.vibration!==false;
-  try{if(window.AndroidBridge.requestExactAlarmPermission)window.AndroidBridge.requestExactAlarmPermission()}catch(e){}
   var base=baseCtx.baseDate;
   for(var offset=0;offset<3;offset++){
     var d=new Date(base);d.setDate(d.getDate()+offset);var times=computePrayerTimes(d),nd=new Date(d);nd.setDate(nd.getDate()+1);var nextTimes=computePrayerTimes(nd),k=dateKey(d);
@@ -284,6 +283,7 @@ function refreshAllV13(){renderDatesV13();renderTodayV13();requestAnimationFrame
 refreshAll=refreshAllV13;
 
 (function initV13Core(){
+  settings.preReminder=10;settings.endReminder=false;localStorage.setItem('no_settings',JSON.stringify(settings));
   installV13Style();installBrandAndLocationV13();installNavbarV13();installQiblaV13();installSettingsExtrasV13();removeHomeEventV13();
   renderDatesV13();renderTodayV13();updateQiblaV13();
   var v13Tick=0;setInterval(function(){if(document.hidden)return;updateCountdownV13();if(++v13Tick%60===0&&autoUpdateQazaV13(true))renderTodayV13()},1000);
