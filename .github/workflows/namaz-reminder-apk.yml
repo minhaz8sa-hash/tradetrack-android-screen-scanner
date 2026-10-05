@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v1.5.0 JavaScript syntax
+      - name: Check v1.5.1 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -34,6 +34,7 @@ jobs:
           node --check web/app7.js
           node --check web/app9.js
           node --check web/app10.js
+          node --check web/app11.js
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -62,13 +63,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.5.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.5.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.5.0
-          path: namaz-reminder/Namaz-Orbit-v1.5.0.apk
+          name: Namaz-Orbit-v1.5.1
+          path: namaz-reminder/Namaz-Orbit-v1.5.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -77,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.5.0 --yes || true
-          git tag -d v1.5.0 2>/dev/null || true
-          git push origin :refs/tags/v1.5.0 2>/dev/null || true
-          gh release create v1.5.0 Namaz-Orbit-v1.5.0.apk --target main --title "Namaz Orbit v1.5.0" --notes "Core performance release: isolated Live Location, Qibla, Prayer Time and Android AlarmManager systems; fixed 10-minute pre-prayer reminder; removed corrupted/animated Guide runtime and Events runtime; reduced startup renders and workflow spam while preserving glass UI."
+          gh release delete v1.5.1 --yes || true
+          git tag -d v1.5.1 2>/dev/null || true
+          git push origin :refs/tags/v1.5.1 2>/dev/null || true
+          gh release create v1.5.1 Namaz-Orbit-v1.5.1.apk --target main --title "Namaz Orbit v1.5.1" --notes "UI regression fixes: restored optimized glassmorphism, rotating Prayer and Qaza orbits, lightweight Namaz Guide, corrected 5-tab navigation, custom Calendar prayer icons, single Alarm Test panel, and alarm Dismiss action. Core Location/Qibla/Prayer/10-minute reminder performance optimizations are retained."
