@@ -144,6 +144,7 @@ showPage=function(name){
 window.openGuidePageV13=function(){showPage('guide-v13')};
 
 (function initV14(){
+  if(window.AndroidBridge)document.documentElement.classList.add('native-perf');
   installHomeTopV14();
   mergePrayerCalendarIntoHomeV14();
   installNavV14();
