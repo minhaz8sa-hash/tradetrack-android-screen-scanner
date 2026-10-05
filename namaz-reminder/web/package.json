@@ -1,0 +1,9 @@
+{
+  "name": "namaz-orbit-web",
+  "private": true,
+  "version": "1.6.0",
+  "type": "module",
+  "dependencies": {
+    "@vercel/blob": "^2.0.0"
+  }
+}
