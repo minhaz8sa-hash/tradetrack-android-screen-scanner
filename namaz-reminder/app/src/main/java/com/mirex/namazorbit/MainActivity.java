@@ -6,6 +6,11 @@ import android.app.AlarmManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.GeomagneticField;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,16 +22,21 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements SensorEventListener {
     private static final int REQ_LOCATION = 42;
     private static final int REQ_NOTIFICATION = 43;
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
+    private WebView web;
+    private SensorManager sensorManager;
+    private Sensor rotationSensor;
+    private volatile Double compassLat = null;
+    private volatile Double compassLon = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        WebView web = new WebView(this);
+        web = new WebView(this);
         setContentView(web);
 
         WebSettings s = web.getSettings();
@@ -53,7 +63,22 @@ public class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
         requestNotificationPermission();
+
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         web.loadUrl("file:///android_asset/index.html");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (rotationSensor != null) sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_UI);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (sensorManager != null) sensorManager.unregisterListener(this);
     }
 
     private void requestNotificationPermission() {
@@ -73,13 +98,64 @@ public class MainActivity extends Activity {
         }
     }
 
-    public static class AndroidBridge {
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() != Sensor.TYPE_ROTATION_VECTOR || web == null) return;
+        float[] matrix = new float[9];
+        float[] orientation = new float[3];
+        SensorManager.getRotationMatrixFromVector(matrix, event.values);
+        SensorManager.getOrientation(matrix, orientation);
+        double azimuth = Math.toDegrees(orientation[0]);
+        if (compassLat != null && compassLon != null) {
+            GeomagneticField field = new GeomagneticField(compassLat.floatValue(), compassLon.floatValue(), 0f, System.currentTimeMillis());
+            azimuth += field.getDeclination();
+        }
+        azimuth = (azimuth + 360.0) % 360.0;
+        final double heading = azimuth;
+        web.post(() -> web.evaluateJavascript("window.onNativeHeading && window.onNativeHeading(" + heading + ");", null));
+    }
+
+    @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+    public class AndroidBridge {
         private final Context context;
         AndroidBridge(Context context) { this.context = context; }
 
         @JavascriptInterface
         public void scheduleAlarm(String id, String prayerName, long timestampMs, String soundType) {
             AlarmScheduler.schedule(context, id, prayerName, timestampMs, soundType, true);
+        }
+
+        @JavascriptInterface
+        public void scheduleAlarmV2(String id, String title, String body, long timestampMs, String soundType, boolean vibrate) {
+            AlarmScheduler.schedule(context, id, title, body, timestampMs, soundType, vibrate, true);
+        }
+
+        @JavascriptInterface
+        public void cancelAlarm(String id) { AlarmScheduler.cancel(context, id); }
+
+        @JavascriptInterface
+        public void cancelByPrefix(String prefix) { AlarmScheduler.cancelByPrefix(context, prefix == null ? "" : prefix); }
+
+        @JavascriptInterface
+        public void clearAllScheduledAlarms() { AlarmScheduler.clearAll(context); }
+
+        @JavascriptInterface
+        public void testAlarm(String soundType, boolean vibrate) {
+            AlarmScheduler.schedule(context,
+                    "NO_TEST_" + System.currentTimeMillis(),
+                    "Namaz Orbit • Test Alarm",
+                    "Alarm sound ও vibration test successful.",
+                    System.currentTimeMillis() + 3000,
+                    soundType == null ? "alarm" : soundType,
+                    vibrate,
+                    false);
+        }
+
+        @JavascriptInterface
+        public void setCompassLocation(double lat, double lon) {
+            compassLat = lat;
+            compassLon = lon;
         }
 
         @JavascriptInterface
