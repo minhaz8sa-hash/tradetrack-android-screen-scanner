@@ -194,3 +194,45 @@ html.native-perf .app{position:relative;z-index:1}
   .qz4{left:17px!important;bottom:7px!important}
   .qz5{left:3px!important}
 }
+
+
+/* v1.5.3: Surah/recitation guide cards + safe orbit viewport */
+#page-home .orbit.one{
+  width:min(calc(100vw - 52px),430px)!important;
+  height:min(calc(100vw - 52px),430px)!important;
+}
+.guide-surah-153{
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.guide-surah-153 h4{
+  margin:0 0 9px;
+  font-size:13px;
+  color:var(--accent);
+}
+.guide-surah-item-153{
+  padding:10px 11px;
+  margin-top:8px;
+  border-radius:14px;
+  border:1px solid rgba(142,240,207,.12);
+  background:rgba(142,240,207,.035);
+}
+.guide-surah-item-153 b{
+  display:block;
+  font-size:11px;
+  color:#ddfff4;
+  margin-bottom:4px;
+}
+.guide-surah-item-153 span{
+  display:block;
+  font-size:11px;
+  line-height:1.6;
+  color:var(--muted);
+}
+@media(max-width:390px){
+  #page-home .orbit.one{
+    width:calc(100vw - 48px)!important;
+    height:calc(100vw - 48px)!important;
+  }
+}
