@@ -13,7 +13,7 @@ var GUIDE_151={
 function installGuide151(){
   if(document.getElementById('page-guide'))return;
   var page=document.createElement('section');page.className='page';page.id='page-guide';
-  page.innerHTML='<div class="panel glass"><div class="section-title" style="margin-top:0"><h3>Namaz Guide</h3><small class="muted">Lightweight • no animation</small></div><div class="guide-list-151" id="guideList151"></div><div class="guide-detail-151 glass" id="guideDetail151" style="display:none"></div><div class="guide-note-151">সংক্ষিপ্ত guideটি Bangladesh-এ প্রচলিত Hanafi practice-এর সাথে মিল রেখে সাজানো। ফিকহভেদে কিছু ছোট পার্থক্য থাকতে পারে; শুদ্ধভাবে শেখার জন্য বিশ্বস্ত শিক্ষক/আলেমের সহায়তা নিন।</div></div>';
+  page.innerHTML='<div class="panel glass"><div class="section-title" style="margin-top:0"><h3>Namaz Guide</h3></div><div class="guide-list-151" id="guideList151"></div><div class="guide-detail-151 glass" id="guideDetail151" style="display:none"></div><div class="guide-note-151">সংক্ষিপ্ত guideটি Bangladesh-এ প্রচলিত Hanafi practice-এর সাথে মিল রেখে সাজানো। ফিকহভেদে কিছু ছোট পার্থক্য থাকতে পারে; শুদ্ধভাবে শেখার জন্য বিশ্বস্ত শিক্ষক/আলেমের সহায়তা নিন।</div></div>';
   var more=document.getElementById('page-more');if(more)more.insertAdjacentElement('beforebegin',page);else document.querySelector('main').appendChild(page);
   var list=document.getElementById('guideList151');
   Object.keys(GUIDE_151).forEach(function(k){var g=GUIDE_151[k],b=document.createElement('button');b.className='guide-card-151';b.innerHTML='<b>'+g.t+'</b><small>'+g.s+'</small>';b.onclick=function(){openGuide151(k)};list.appendChild(b)});
