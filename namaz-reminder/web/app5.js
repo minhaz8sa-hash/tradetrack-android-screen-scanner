@@ -8,8 +8,6 @@ function renderDates(){const n=new Date();document.getElementById('gregorianDate
 function refreshAll(){renderDates();renderToday();renderCalendar();renderQaza()}
 
 renderSurahList();loadSettings();
-setInterval(()=>{updateCountdown();autoUpdateQaza()},1000);
-setTimeout(()=>{if(!coords)detectLocation()},900);
 
 /* Namaz Orbit v1.1.0 upgrades: alarm test/vibration, end countdown, serial Qaza plan, icons, Qibla, Quran Bangla pronunciation */
 
@@ -189,9 +187,6 @@ openSurah=async function(n){
 
 (function initV110(){
   installUpgradeUI();
-  localStorage.setItem('no_settings',JSON.stringify(settings));loadSettings();
-  const q=document.getElementById('qiblaCompass');if(q)q.addEventListener('click',enableCompass);
-  window.addEventListener('deviceorientationabsolute',orientationHandler,true);
-  renderToday();renderQaza();updateQibla();
-  setInterval(updateQibla,1000);
+  localStorage.setItem('no_settings',JSON.stringify(settings));
+  loadSettings();
 })();
