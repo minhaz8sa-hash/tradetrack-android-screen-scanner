@@ -15,6 +15,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Surface;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -33,6 +34,9 @@ public class MainActivity extends Activity implements SensorEventListener {
     private volatile Double compassLat = null;
     private volatile Double compassLon = null;
     private long lastCompassDispatchMs = 0L;
+    private boolean hasSmoothedHeading = false;
+    private double smoothedHeadingSin = 0.0;
+    private double smoothedHeadingCos = 1.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,21 +113,101 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() != Sensor.TYPE_ROTATION_VECTOR || web == null) return;
+
         long nowMs = android.os.SystemClock.elapsedRealtime();
-        if (nowMs - lastCompassDispatchMs < 140L) return;
+        if (nowMs - lastCompassDispatchMs < 120L) return;
         lastCompassDispatchMs = nowMs;
-        float[] matrix = new float[9];
-        float[] orientation = new float[3];
-        SensorManager.getRotationMatrixFromVector(matrix, event.values);
-        SensorManager.getOrientation(matrix, orientation);
-        double azimuth = Math.toDegrees(orientation[0]);
+
+        float[] baseMatrix = new float[9];
+        SensorManager.getRotationMatrixFromVector(baseMatrix, event.values);
+
+        float[] screenMatrix = baseMatrix;
+        float[] remapped = new float[9];
+        int rotation = getWindowManager().getDefaultDisplay().getRotation();
+        boolean ok = true;
+
+        switch (rotation) {
+            case Surface.ROTATION_90:
+                ok = SensorManager.remapCoordinateSystem(
+                        baseMatrix,
+                        SensorManager.AXIS_Y,
+                        SensorManager.AXIS_MINUS_X,
+                        remapped
+                );
+                break;
+            case Surface.ROTATION_180:
+                ok = SensorManager.remapCoordinateSystem(
+                        baseMatrix,
+                        SensorManager.AXIS_MINUS_X,
+                        SensorManager.AXIS_MINUS_Y,
+                        remapped
+                );
+                break;
+            case Surface.ROTATION_270:
+                ok = SensorManager.remapCoordinateSystem(
+                        baseMatrix,
+                        SensorManager.AXIS_MINUS_Y,
+                        SensorManager.AXIS_X,
+                        remapped
+                );
+                break;
+            case Surface.ROTATION_0:
+            default:
+                ok = true;
+                break;
+        }
+
+        if (rotation != Surface.ROTATION_0 && ok) screenMatrix = remapped;
+
+        // Android world axes: X = East, Y = magnetic North, Z = Up.
+        // Project the top edge of the screen onto the horizontal plane. This
+        // remains stable even when the phone is slightly tilted.
+        double east = screenMatrix[1];
+        double north = screenMatrix[4];
+        double horizontalProjection = Math.hypot(east, north);
+
+        double azimuth;
+        if (horizontalProjection > 0.12) {
+            azimuth = Math.toDegrees(Math.atan2(east, north));
+        } else {
+            float[] orientation = new float[3];
+            SensorManager.getOrientation(screenMatrix, orientation);
+            azimuth = Math.toDegrees(orientation[0]);
+        }
+
+        // Convert magnetic heading to true-north heading for Qibla bearing.
         if (compassLat != null && compassLon != null) {
-            GeomagneticField field = new GeomagneticField(compassLat.floatValue(), compassLon.floatValue(), 0f, System.currentTimeMillis());
+            GeomagneticField field = new GeomagneticField(
+                    compassLat.floatValue(),
+                    compassLon.floatValue(),
+                    0f,
+                    System.currentTimeMillis()
+            );
             azimuth += field.getDeclination();
         }
+
         azimuth = (azimuth + 360.0) % 360.0;
-        final double heading = azimuth;
-        web.post(() -> web.evaluateJavascript("window.onNativeHeading && window.onNativeHeading(" + heading + ");", null));
+
+        // Circular low-pass filter avoids the 359°/0° jump and compass jitter.
+        double radians = Math.toRadians(azimuth);
+        double alpha = 0.28;
+        if (!hasSmoothedHeading) {
+            smoothedHeadingSin = Math.sin(radians);
+            smoothedHeadingCos = Math.cos(radians);
+            hasSmoothedHeading = true;
+        } else {
+            smoothedHeadingSin = (1.0 - alpha) * smoothedHeadingSin + alpha * Math.sin(radians);
+            smoothedHeadingCos = (1.0 - alpha) * smoothedHeadingCos + alpha * Math.cos(radians);
+        }
+
+        double smoothed = Math.toDegrees(Math.atan2(smoothedHeadingSin, smoothedHeadingCos));
+        smoothed = (smoothed + 360.0) % 360.0;
+        final double heading = smoothed;
+
+        web.post(() -> web.evaluateJavascript(
+                "window.onNativeHeading && window.onNativeHeading(" + heading + ");",
+                null
+        ));
     }
 
     @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
