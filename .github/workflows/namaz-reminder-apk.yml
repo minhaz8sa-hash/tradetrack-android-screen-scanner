@@ -9,6 +9,10 @@ on:
   workflow_dispatch:
 
 
+concurrency:
+  group: namaz-orbit-performance-v142
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
