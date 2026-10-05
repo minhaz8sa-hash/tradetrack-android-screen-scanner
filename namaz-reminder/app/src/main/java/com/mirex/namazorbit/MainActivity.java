@@ -22,12 +22,15 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.ValueCallback;
 
 public class MainActivity extends Activity implements SensorEventListener {
     private static final int REQ_LOCATION = 42;
     private static final int REQ_NOTIFICATION = 43;
+    private static final int REQ_FILE = 44;
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
+    private ValueCallback<Uri[]> filePathCallback;
     private WebView web;
     private SensorManager sensorManager;
     private Sensor rotationSensor;
@@ -65,6 +68,21 @@ public class MainActivity extends Activity implements SensorEventListener {
                     geoOrigin = origin;
                     geoCallback = callback;
                     requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOCATION);
+                }
+            }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                filePathCallback = callback;
+                try {
+                    Intent chooser = params.createIntent();
+                    chooser.setType("image/*");
+                    startActivityForResult(chooser, REQ_FILE);
+                    return true;
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    return false;
                 }
             }
         });
@@ -118,6 +136,16 @@ public class MainActivity extends Activity implements SensorEventListener {
                 geoOrigin = null;
             }
             notifyLocationPermissionToWeb();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE && filePathCallback != null) {
+            Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
         }
     }
 
