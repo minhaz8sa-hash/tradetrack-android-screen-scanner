@@ -82,6 +82,17 @@ public class MainActivity extends Activity implements SensorEventListener {
     protected void onResume() {
         super.onResume();
         if (rotationSensor != null) sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        notifyLocationPermissionToWeb();
+    }
+
+    private void notifyLocationPermissionToWeb() {
+        if (web == null) return;
+        final boolean granted = Build.VERSION.SDK_INT < 23 ||
+                checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        web.postDelayed(() -> web.evaluateJavascript(
+                "window.onNativeLocationPermissionChanged && window.onNativeLocationPermissionChanged(" + granted + ");",
+                null
+        ), 250);
     }
 
     @Override
@@ -99,14 +110,14 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_LOCATION && geoCallback != null) {
+        if (requestCode == REQ_LOCATION) {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-            geoCallback.invoke(geoOrigin, granted, false);
-            geoCallback = null;
-            geoOrigin = null;
-            if (granted && web != null) {
-                web.post(() -> web.evaluateJavascript("window.hideLocationOnboarding && window.hideLocationOnboarding();", null));
+            if (geoCallback != null) {
+                geoCallback.invoke(geoOrigin, granted, false);
+                geoCallback = null;
+                geoOrigin = null;
             }
+            notifyLocationPermissionToWeb();
         }
     }
 
