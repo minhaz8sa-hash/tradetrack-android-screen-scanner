@@ -32,9 +32,10 @@ function installNav151(){
     '<button data-page="qaza" onclick="showPage(\'qaza\')"><i>'+v13Svg('qaza')+'</i>Qaza</button>'+
     '<button data-page="more" onclick="showPage(\'more\')"><i>'+v13Svg('more')+'</i>More</button>';
 }
-var qazaOrbitSig151='';
-function renderQazaOrbit151(){
+var qazaOrbitSig151='',qazaOrbitLastScan151=0;
+function renderQazaOrbit151(force){
   var ring=document.querySelector('.orbit.two');if(!ring)return;
+  var now=Date.now();if(!force&&now-qazaOrbitLastScan151<15000)return;qazaOrbitLastScan151=now;
   var queue=typeof qazaQueue==='function'?qazaQueue():[];
   var sig=queue.slice(0,5).map(function(q){return q.dateKey+'|'+q.prayer.key}).join(',');
   if(sig===qazaOrbitSig151&&ring.dataset.qazaReady==='1')return;
@@ -46,12 +47,12 @@ function renderQazaOrbit151(){
   queue.slice(0,5).forEach(function(q,i){
     var el=document.createElement('button');el.className='qaza-orbit-icon qz'+(i+1);
     el.innerHTML=v13Icon(q.prayer.key);el.title=q.prayer.bn+' • Qaza • '+q.dateKey;
-    el.onclick=function(ev){ev.stopPropagation();markComplete(q.dateKey,q.prayer.key,true);setTimeout(renderQazaOrbit151,40)};
+    el.onclick=function(ev){ev.stopPropagation();markComplete(q.dateKey,q.prayer.key,true);setTimeout(function(){renderQazaOrbit151(true)},40)};
     ring.appendChild(el);
   });
 }
 var oldUpdateOrbit151=updateOrbitV14;
-updateOrbitV14=function(current){oldUpdateOrbit151(current);renderQazaOrbit151()};
+updateOrbitV14=function(current){oldUpdateOrbit151(current);renderQazaOrbit151(false)};
 v13UpdateOrbit=updateOrbitV14;
 
 var oldShowPage151=showPage;
@@ -67,5 +68,5 @@ showPage=function(name){
   var dup=document.querySelector('.test-alarm');if(dup)dup.remove();
   var small=document.querySelector('.brand small');if(small)small.textContent='Prayer • Guide • Quran • Qaza';
   document.body.classList.add('home-orbit-active');
-  renderQazaOrbit151();
+  renderQazaOrbit151(true);
 })();
