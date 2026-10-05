@@ -8,9 +8,6 @@ on:
       - '.github/workflows/namaz-reminder-apk.yml'
   workflow_dispatch:
 
-concurrency:
-  group: namaz-orbit-apk-main
-  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -25,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check v1.4 JavaScript syntax
+      - name: Check v1.4.1 JavaScript syntax
         run: |
           node --check web/app7.js
           node --check web/app8.js
@@ -52,13 +49,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.4.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.4.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.4.0
-          path: namaz-reminder/Namaz-Orbit-v1.4.0.apk
+          name: Namaz-Orbit-v1.4.1
+          path: namaz-reminder/Namaz-Orbit-v1.4.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -67,7 +64,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.4.0 --yes || true
-          git tag -d v1.4.0 2>/dev/null || true
-          git push origin :refs/tags/v1.4.0 2>/dev/null || true
-          gh release create v1.4.0 Namaz-Orbit-v1.4.0.apk --target main --title "Namaz Orbit v1.4.0" --notes "Merged Prayer and Calendar into Home, larger interactive Qibla orbit, Qaza red-dot quick completion, top next-prayer countdown, compact live location, Guide navbar, plus prior v1.3 features."
+          gh release delete v1.4.1 --yes || true
+          git tag -d v1.4.1 2>/dev/null || true
+          git push origin :refs/tags/v1.4.1 2>/dev/null || true
+          gh release create v1.4.1 Namaz-Orbit-v1.4.1.apk --target main --title "Namaz Orbit v1.4.1" --notes "Merged Prayer and Calendar into Home, larger interactive Qibla orbit, Qaza red-dot quick completion, top next-prayer countdown, compact live location, Guide navbar, plus prior v1.3 features."
