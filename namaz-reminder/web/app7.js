@@ -225,10 +225,8 @@ function v13UpdateOrbit(current){
 function installNavbarV13(){
   var nav=document.getElementById('nav');if(!nav)return;
   nav.innerHTML='<button class="active" data-page="home" onclick="showPage(\'home\')"><i>'+v13Svg('home')+'</i>Home</button>'+
-    '<button data-page="prayer" onclick="showPage(\'prayer\')"><i>'+v13Svg('prayer')+'</i>Prayer</button>'+
     '<button data-page="quran" onclick="showPage(\'quran\')"><i>'+v13Svg('quran')+'</i>Quran</button>'+
     '<button data-page="qaza" onclick="showPage(\'qaza\')"><i>'+v13Svg('qaza')+'</i>Qaza</button>'+
-    '<button data-page="events" onclick="openIslamicEvents()"><i>'+v13Svg('events')+'</i>Events</button>'+
     '<button data-page="more" onclick="showPage(\'more\')"><i>'+v13Svg('more')+'</i>More</button>';
 }
 var oldShowPageV13=showPage;
@@ -241,7 +239,7 @@ showPage=function(name){
 
 function installBrandAndLocationV13(){
   var logo=document.querySelector('.brand .logo');if(logo)logo.innerHTML=v13LogoSvg();
-  var small=document.querySelector('.brand small');if(small)small.textContent='Prayer • Quran • Qaza • Events';
+  var small=document.querySelector('.brand small');if(small)small.textContent='Prayer • Quran • Qaza';
   var btn=document.querySelector('.topbar > .pill');if(btn){btn.classList.add('location-trigger');btn.innerHTML=v13Svg('location')+'<span>Location</span>';btn.setAttribute('onclick','showLocationOnboarding()')}
   if(document.getElementById('locationOnboarding'))return;
   var modal=document.createElement('div');modal.id='locationOnboarding';modal.className='location-modal';modal.innerHTML='<div class="location-sheet"><div class="location-art">'+v13Svg('location')+'</div><h2>Location access দিন</h2><p>আপনার সঠিক নামাজের সময়, Qibla direction ও location-based schedule আপডেট করার জন্য Location permission দরকার। Bangladesh-এ থাকলে app Dhaka time (UTC+6) ব্যবহার করবে।</p><div class="location-actions"><button class="btn primary full" onclick="grantLocationV13()">Use precise location</button><button class="btn full" onclick="openAlwaysLocationV13()">Always location settings</button><button class="btn full" onclick="hideLocationOnboarding()">Later</button></div><div class="location-note">“Allow all the time” background auto-location update-এর জন্য recommended. Exact prayer alarms saved location দিয়েও চলতে পারে.</div></div>';
@@ -282,12 +280,12 @@ testAlarm=testAlarmV13;
 function removeHomeEventV13(){var e=document.getElementById('liveIslamicEvent');if(e)e.remove()}
 function renderDatesV13(){var n=locationNow();var g=document.getElementById('gregorianDate');if(g)g.textContent=n.toLocaleDateString('bn-BD',{weekday:'long',day:'numeric',month:'long',year:'numeric'});try{var h=document.getElementById('hijriDate');if(h)h.textContent=new Intl.DateTimeFormat('bn-BD-u-ca-islamic',{day:'numeric',month:'long',year:'numeric'}).format(n)}catch(e){}}
 renderDates=renderDatesV13;
-function refreshAllV13(){renderDatesV13();renderTodayV13();requestAnimationFrame(function(){var home=document.getElementById('page-home');if(home&&home.classList.contains('active'))renderCalendar();var q=document.getElementById('page-qaza');if(q&&q.classList.contains('active'))renderQaza()});removeHomeEventV13()}
+function refreshAllV13(){renderDatesV13();renderTodayV13();requestAnimationFrame(function(){var home=document.getElementById('page-home');if(home&&home.classList.contains('active'))renderCalendar();var q=document.getElementById('page-qaza');if(q&&q.classList.contains('active'))renderQaza()})}
 refreshAll=refreshAllV13;
 
 (function initV13Core(){
   installV13Style();installBrandAndLocationV13();installNavbarV13();installQiblaV13();installSettingsExtrasV13();removeHomeEventV13();
   renderDatesV13();renderTodayV13();updateQiblaV13();
-  var v13Tick=0;setInterval(function(){if(document.hidden)return;updateCountdownV13();removeHomeEventV13();if(++v13Tick%60===0&&autoUpdateQazaV13(true))renderTodayV13()},1000);
+  var v13Tick=0;setInterval(function(){if(document.hidden)return;updateCountdownV13();if(++v13Tick%60===0&&autoUpdateQazaV13(true))renderTodayV13()},1000);
   setTimeout(function(){if(!hasLocationV13())showLocationOnboarding()},500);
 })();
