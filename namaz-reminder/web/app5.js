@@ -7,7 +7,7 @@ function showPage(name){document.querySelectorAll('.page').forEach(x=>x.classLis
 function renderDates(){const n=new Date();document.getElementById('gregorianDate').textContent=n.toLocaleDateString('bn-BD',{weekday:'long',day:'numeric',month:'long',year:'numeric'});try{document.getElementById('hijriDate').textContent=new Intl.DateTimeFormat('bn-BD-u-ca-islamic',{day:'numeric',month:'long',year:'numeric'}).format(n)}catch(e){document.getElementById('hijriDate').textContent='Hijri calendar'} }
 function refreshAll(){renderDates();renderToday();renderCalendar();renderQaza()}
 
-renderGuideGrid();renderSurahList();loadSettings();renderDates();renderToday();renderCalendar();renderQaza();
+renderSurahList();loadSettings();
 setInterval(()=>{updateCountdown();autoUpdateQaza()},1000);
 setTimeout(()=>{if(!coords)detectLocation()},900);
 
