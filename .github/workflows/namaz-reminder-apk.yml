@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v1.5.2 JavaScript syntax
+      - name: Check v1.5.3 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -63,13 +63,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.5.2.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.5.3.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.5.2
-          path: namaz-reminder/Namaz-Orbit-v1.5.2.apk
+          name: Namaz-Orbit-v1.5.3
+          path: namaz-reminder/Namaz-Orbit-v1.5.3.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -78,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.5.2 --yes || true
-          git tag -d v1.5.2 2>/dev/null || true
-          git push origin :refs/tags/v1.5.2 2>/dev/null || true
-          gh release create v1.5.2 Namaz-Orbit-v1.5.2.apk --target main --title "Namaz Orbit v1.5.2" --notes "Fixes: restored grid background, removed Home Prayer Alarm card and Guide implementation label, added orbit clearance, corrected native Qibla compass heading with screen-orientation remap and smoothing, and added direct alarm vibration with Dismiss cancellation. Existing performance optimizations remain."
+          gh release delete v1.5.3 --yes || true
+          git tag -d v1.5.3 2>/dev/null || true
+          git push origin :refs/tags/v1.5.3 2>/dev/null || true
+          gh release create v1.5.3 Namaz-Orbit-v1.5.3.apk --target main --title "Namaz Orbit v1.5.3" --notes "Fixes: prayer and Qaza orbit icons stay inside their circle while rotating; Namaz Guide now includes Surah/recitation guidance per prayer with recommended versus non-mandatory recitations clearly separated. Previous Qibla, vibration, grid background and performance fixes remain."
