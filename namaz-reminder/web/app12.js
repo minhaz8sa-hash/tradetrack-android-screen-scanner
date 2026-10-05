@@ -71,6 +71,7 @@
       var p=PRAYERS[i], st=state[p.key]||'pending';
       b.classList.toggle('active-prayer',p.key===current);
       b.classList.toggle('qaza-main',st==='qaza');
+      b.style.display=st==='qaza'?'none':'grid';
       b.title=p.bn+' • '+p.name+(st==='qaza'?' • Qaza':'');
     });
   }
