@@ -11,9 +11,35 @@ import android.media.AudioAttributes;
 import android.net.Uri;
 import android.provider.Settings;
 import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
 
 public class PrayerAlarmReceiver extends BroadcastReceiver {
     private static final String ACTION_DISMISS = "com.mirex.namazorbit.DISMISS_ALARM";
+
+    private static Vibrator getVibrator(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            VibratorManager vm = (VibratorManager) context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+            return vm != null ? vm.getDefaultVibrator() : null;
+        }
+        return (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
+    }
+
+    private static void startAlarmVibration(Context context) {
+        Vibrator vibrator = getVibrator(context);
+        if (vibrator == null || !vibrator.hasVibrator()) return;
+        long[] pattern = new long[]{
+                0, 700, 300, 700, 300, 900,
+                450, 700, 300, 700, 300, 900
+        };
+        vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1));
+    }
+
+    private static void stopAlarmVibration(Context context) {
+        Vibrator vibrator = getVibrator(context);
+        if (vibrator != null) vibrator.cancel();
+    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -21,6 +47,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
 
         if (ACTION_DISMISS.equals(intent.getAction())) {
             int notificationId = intent.getIntExtra("notification_id", -1);
+            stopAlarmVibration(context);
             if (notificationId >= 0) nm.cancel(notificationId);
             return;
         }
@@ -37,7 +64,9 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
         String notificationKey = eventId != null ? eventId : prayer + "_" + (System.currentTimeMillis() / 60000L);
         int notificationId = notificationKey.hashCode() & 0x7fffffff;
 
-        String channelId = "prayer_v3_" + sound + "_" + (vibrate ? "v" : "n");
+        if (vibrate) startAlarmVibration(context);
+
+        String channelId = "prayer_v4_" + sound + "_" + (vibrate ? "v" : "n");
         Uri uri = "notification".equals(sound)
                 ? Settings.System.DEFAULT_NOTIFICATION_URI
                 : Settings.System.DEFAULT_ALARM_ALERT_URI;
