@@ -71,21 +71,8 @@ function installCoreCardsV15(){
     prayerPanel.appendChild(list);
   }
 
-  if(!document.getElementById('coreAlarmPanelV15')){
-    var alarmPanel=document.createElement('section');
-    alarmPanel.id='coreAlarmPanelV15';
-    alarmPanel.className='core-card-v15';
-    alarmPanel.innerHTML=
-      '<div class="core-head-v15"><h3>Prayer Alarm</h3><span class="core-status-v15"><span class="dot"></span><span id="coreAlarmStateV15">Checking</span></span></div>'+
-      '<div class="core-alarm-grid-v15">'+
-        '<div><div class="core-alarm-title-v15">Automatic reminder • 10 minutes before</div>'+
-        '<div class="core-alarm-sub-v15" id="coreAlarmSubV15">Prayer start alarms and 10-minute reminders use Android AlarmManager.</div></div>'+
-        '<div class="core-alarm-actions-v15"><button class="core-mini-btn-v15" onclick="testAlarmV13()">Test</button><button class="core-mini-btn-v15" onclick="requestExactAlarm()">Alarm access</button></div>'+
-      '</div>';
-    var prayerPanel=document.getElementById('corePrayerPanelV15');
-    if(prayerPanel)prayerPanel.insertAdjacentElement('afterend',alarmPanel);
-    else home.appendChild(alarmPanel);
-  }
+  var staleAlarmPanel=document.getElementById('coreAlarmPanelV15');
+  if(staleAlarmPanel)staleAlarmPanel.remove();
 
   var cal=document.getElementById('homeCalendarV14');
   if(cal)cal.classList.add('core-calendar-v15');
