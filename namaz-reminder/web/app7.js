@@ -42,11 +42,25 @@ computeHours=function(date,lat,lon){
   var tz=locationUtcOffsetHours(date);for(var q in t)t[q]+=tz-lon/15+(Number(settings.adjust)||0)/60;return t;
 };
 
+var v13PrayerCache=Object.create(null);
+function v13PrayerCacheKey(date){
+  var c=coords||{lat:23.8103,lon:90.4125};
+  return dateKey(date)+'|'+c.lat.toFixed(4)+'|'+c.lon.toFixed(4)+'|'+(settings.calcMethod||'karachi')+'|'+(settings.asrMethod||'hanafi')+'|'+(Number(settings.adjust)||0);
+}
+function v13CachedPrayerTimes(date){
+  var key=v13PrayerCacheKey(date);
+  if(v13PrayerCache[key])return v13PrayerCache[key];
+  var value=computePrayerTimes(date);
+  v13PrayerCache[key]=value;
+  var keys=Object.keys(v13PrayerCache);
+  if(keys.length>12)delete v13PrayerCache[keys[0]];
+  return value;
+}
 function prayerCycleContext(now){
   now=now||locationNow();
-  var civil=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12,0,0),today=computePrayerTimes(civil),base=new Date(civil);
+  var civil=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12,0,0),today=v13CachedPrayerTimes(civil),base=new Date(civil);
   if(now<today.fajr)base.setDate(base.getDate()-1);
-  var times=computePrayerTimes(base),nextDate=new Date(base);nextDate.setDate(nextDate.getDate()+1);var nextTimes=computePrayerTimes(nextDate);
+  var times=v13CachedPrayerTimes(base),nextDate=new Date(base);nextDate.setDate(nextDate.getDate()+1);var nextTimes=v13CachedPrayerTimes(nextDate);
   return {now:now,baseDate:base,key:dateKey(base),times:times,nextTimes:nextTimes};
 }
 function v13PrayerEnd(ctx,key){return endForPrayer(ctx.times,key,ctx.nextTimes)}
@@ -65,21 +79,27 @@ function v13Icon(key){
   return '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="none" stroke="#8ef0cf" stroke-width="2"/><text x="24" y="29" text-anchor="middle" fill="#8ef0cf" font-size="15" font-family="sans-serif">'+label+'</text></svg>';
 }
 
-function autoUpdateQazaV13(){
-  var now=locationNow(),ctx=prayerCycleContext(now),keys=[];
+var v13LastQazaSweep=0;
+function autoUpdateQazaV13(force){
+  var ts=Date.now();
+  if(!force&&ts-v13LastQazaSweep<60000)return false;
+  v13LastQazaSweep=ts;
+  var now=locationNow(),ctx=prayerCycleContext(now),keys=[],changedAny=false;
   for(var i=0;i<localStorage.length;i++){var kk=localStorage.key(i);if(kk&&kk.indexOf('no_schedule_')===0)keys.push(kk.replace('no_schedule_',''))}
   if(keys.indexOf(ctx.key)<0)keys.push(ctx.key);
   keys.forEach(function(k){
-    var schedule=getSchedule(k),base=localDateFromKey(k);if(!schedule){if(k!==ctx.key)return;var tt=computePrayerTimes(base);saveSchedule(k,tt);schedule=getSchedule(k)}
-    var state=getDayState(k),nextBase=new Date(base);nextBase.setDate(nextBase.getDate()+1);var next=computePrayerTimes(nextBase),temp={};
+    var schedule=getSchedule(k),base=localDateFromKey(k);if(!schedule){if(k!==ctx.key)return;var tt=v13CachedPrayerTimes(base);saveSchedule(k,tt);schedule=getSchedule(k)}
+    var state=getDayState(k),nextBase=new Date(base);nextBase.setDate(nextBase.getDate()+1);var next=v13CachedPrayerTimes(nextBase),temp={},changed=false;
     PRAYERS.forEach(function(p){temp[p.key]=new Date(schedule[p.key])});temp.sunrise=new Date(schedule.sunrise);
-    PRAYERS.forEach(function(p){if(state[p.key]==='complete'||state[p.key]==='qaza-complete')return;var end=endForPrayer(temp,p.key,next);if(now>=end)state[p.key]='qaza'});
-    setDayState(k,state);
+    PRAYERS.forEach(function(p){if(state[p.key]==='complete'||state[p.key]==='qaza-complete'||state[p.key]==='qaza')return;var end=endForPrayer(temp,p.key,next);if(now>=end){state[p.key]='qaza';changed=true;changedAny=true}});
+    if(changed)setDayState(k,state);
   });
+  return changedAny;
 }
 autoUpdateQaza=autoUpdateQazaV13;
 
 function renderTodayV13(){
+  window._lastHomeFullRenderV13=Date.now();
   var ctx=prayerCycleContext(),k=ctx.key;todayTimes=ctx.times;saveSchedule(k,ctx.times);autoUpdateQazaV13();
   var state=getDayState(k),current=v13CurrentPrayer(ctx),next=v13NextPrayer(ctx);
   var complete=PRAYERS.filter(function(p){return state[p.key]==='complete'||state[p.key]==='qaza-complete'}).length;
@@ -123,13 +143,16 @@ function updateCountdownV13(){
 }
 updateCountdown=updateCountdownV13;
 
-function scheduleAlarmsV13(){
+var v13AlarmScheduleSignature='';
+function scheduleAlarmsV13(force){
   if(!window.AndroidBridge)return;
-  if(typeof alarmRefreshGuard!=='undefined'&&Date.now()-alarmRefreshGuard<2500)return;
-  if(typeof alarmRefreshGuard!=='undefined')alarmRefreshGuard=Date.now();
+  var baseCtx=prayerCycleContext(),c=coords||{lat:23.8103,lon:90.4125};
+  var sig=baseCtx.key+'|'+c.lat.toFixed(4)+'|'+c.lon.toFixed(4)+'|'+JSON.stringify(settings);
+  if(!force&&sig===v13AlarmScheduleSignature)return;
+  v13AlarmScheduleSignature=sig;
   var sound=settings.alarmSound||'alarm',pre=Number(settings.preReminder)||0,vibrate=settings.vibration!==false;
   try{if(window.AndroidBridge.requestExactAlarmPermission)window.AndroidBridge.requestExactAlarmPermission()}catch(e){}
-  var base=prayerCycleContext().baseDate;
+  var base=baseCtx.baseDate;
   for(var offset=0;offset<3;offset++){
     var d=new Date(base);d.setDate(d.getDate()+offset);var times=computePrayerTimes(d),nd=new Date(d);nd.setDate(nd.getDate()+1);var nextTimes=computePrayerTimes(nd),k=dateKey(d);
     PRAYERS.forEach(function(p){
@@ -151,8 +174,8 @@ function saveSettingsV13(){
   settings.preReminder=Number(document.getElementById('preReminder').value)||0;
   var v=document.getElementById('vibrationEnabled'),e=document.getElementById('endReminderEnabled');settings.vibration=v?v.checked:true;settings.endReminder=e?e.checked:true;
   localStorage.setItem('no_settings',JSON.stringify(settings));
-  if(typeof alarmRefreshGuard!=='undefined')alarmRefreshGuard=0;
-  renderTodayV13();renderCalendar();toast('Settings saved ✓');
+  v13PrayerCache=Object.create(null);v13AlarmScheduleSignature='';
+  renderTodayV13();scheduleAlarmsV13(true);requestAnimationFrame(function(){renderCalendar()});toast('Settings saved ✓');
 }
 saveSettings=saveSettingsV13;
 function loadSettingsV13(){
@@ -174,14 +197,26 @@ function qiblaBearingV13(){
   var c=coords||{lat:23.8103,lon:90.4125},lat=dtr(c.lat),lon=dtr(c.lon),klat=dtr(21.4225),klon=dtr(39.8262),dlon=klon-lon;
   return fixAngle(rtd(Math.atan2(Math.sin(dlon),Math.cos(lat)*Math.tan(klat)-Math.sin(lat)*Math.cos(dlon))));
 }
-var v13Heading=null;
-window.onNativeHeading=function(deg){if(Number.isFinite(Number(deg))){v13Heading=Number(deg);updateQiblaV13()}};
+var v13Heading=null,v13CompassRaf=0,v13LastCompassPaint=0,v13CompassLocKey='';
+window.onNativeHeading=function(deg){
+  if(!Number.isFinite(Number(deg)))return;
+  var home=document.getElementById('page-home');if(!home||!home.classList.contains('active'))return;
+  v13Heading=Number(deg);
+  var now=performance.now();if(now-v13LastCompassPaint<120)return;
+  v13LastCompassPaint=now;
+  if(v13CompassRaf)return;
+  v13CompassRaf=requestAnimationFrame(function(){v13CompassRaf=0;updateQiblaV13()});
+};
 function updateQiblaV13(){
   var n=document.getElementById('qiblaNeedleV13');if(!n)return;var bearing=qiblaBearingV13();
-  try{if(window.AndroidBridge&&window.AndroidBridge.setCompassLocation&&coords)window.AndroidBridge.setCompassLocation(coords.lat,coords.lon)}catch(e){}
-  var rotation=bearing-(v13Heading===null?0:v13Heading)-90;n.style.transform='rotate('+rotation+'deg)';
-  var b=document.getElementById('qiblaBearingV13');if(b)b.textContent=Math.round(bearing)+'°';
-  var t=document.getElementById('qiblaTextV13');if(t)t.textContent=v13Heading===null?'Qibla bearing • move phone':'Live compass • arrow up = Qibla';
+  if(window.AndroidBridge&&window.AndroidBridge.setCompassLocation&&coords){
+    var key=coords.lat.toFixed(4)+','+coords.lon.toFixed(4);
+    if(key!==v13CompassLocKey){v13CompassLocKey=key;try{window.AndroidBridge.setCompassLocation(coords.lat,coords.lon)}catch(e){}}
+  }
+  var rotation=bearing-(v13Heading===null?0:v13Heading)-90;
+  var transform='rotate('+rotation.toFixed(1)+'deg)';if(n.style.transform!==transform)n.style.transform=transform;
+  var b=document.getElementById('qiblaBearingV13'),bt=Math.round(bearing)+'°';if(b&&b.textContent!==bt)b.textContent=bt;
+  var t=document.getElementById('qiblaTextV13'),tt=v13Heading===null?'Qibla bearing • move phone':'Live compass • arrow up = Qibla';if(t&&t.textContent!==tt)t.textContent=tt;
 }
 function v13UpdateOrbit(current){
   document.querySelectorAll('.orbit.one .picon').forEach(function(el,i){var p=PRAYERS[i];if(!p)return;el.innerHTML=v13Icon(p.key);el.classList.toggle('active-prayer',p.key===current);el.title=p.bn+' • '+p.name});
@@ -201,7 +236,7 @@ showPage=function(name){
   oldShowPageV13(name);
   document.querySelectorAll('#nav button').forEach(function(x){x.classList.toggle('active',x.dataset.page===name)});
   if(name==='more')loadSettingsV13();
-  if(name==='home'){renderTodayV13();updateQiblaV13()}
+  if(name==='home'){if(Date.now()-(window._lastHomeFullRenderV13||0)>60000)renderTodayV13();else updateCountdownV13();updateQiblaV13()}
 };
 
 function installBrandAndLocationV13(){
@@ -247,12 +282,12 @@ testAlarm=testAlarmV13;
 function removeHomeEventV13(){var e=document.getElementById('liveIslamicEvent');if(e)e.remove()}
 function renderDatesV13(){var n=locationNow();var g=document.getElementById('gregorianDate');if(g)g.textContent=n.toLocaleDateString('bn-BD',{weekday:'long',day:'numeric',month:'long',year:'numeric'});try{var h=document.getElementById('hijriDate');if(h)h.textContent=new Intl.DateTimeFormat('bn-BD-u-ca-islamic',{day:'numeric',month:'long',year:'numeric'}).format(n)}catch(e){}}
 renderDates=renderDatesV13;
-function refreshAllV13(){renderDatesV13();renderTodayV13();renderCalendar();renderQaza();removeHomeEventV13()}
+function refreshAllV13(){renderDatesV13();renderTodayV13();requestAnimationFrame(function(){var home=document.getElementById('page-home');if(home&&home.classList.contains('active'))renderCalendar();var q=document.getElementById('page-qaza');if(q&&q.classList.contains('active'))renderQaza()});removeHomeEventV13()}
 refreshAll=refreshAllV13;
 
 (function initV13Core(){
   installV13Style();installBrandAndLocationV13();installNavbarV13();installQiblaV13();installSettingsExtrasV13();removeHomeEventV13();
   renderDatesV13();renderTodayV13();updateQiblaV13();
-  setInterval(function(){updateCountdownV13();updateQiblaV13();removeHomeEventV13()},1000);
+  var v13Tick=0;setInterval(function(){if(document.hidden)return;updateCountdownV13();removeHomeEventV13();if(++v13Tick%60===0&&autoUpdateQazaV13(true))renderTodayV13()},1000);
   setTimeout(function(){if(!hasLocationV13())showLocationOnboarding()},500);
 })();
