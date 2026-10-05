@@ -90,33 +90,33 @@ function updateOrbitV14(current){
   var ctx=prayerCycleContext(),state=getDayState(ctx.key);
   document.querySelectorAll('.orbit.one .picon').forEach(function(el,i){
     var p=PRAYERS[i];if(!p)return;
-    el.innerHTML=v13Icon(p.key);
-    var st=state[p.key]||'pending';
+    var st=state[p.key]||'pending',sig=p.key+'|'+st+'|'+(p.key===current?'1':'0');
+    if(!el.dataset.v14Ready){
+      el.innerHTML=v13Icon(p.key);
+      el.setAttribute('role','button');el.setAttribute('tabindex','0');
+      el.onclick=function(ev){ev.stopPropagation();v14PrayerIconTap(p.key)};
+      el.onkeydown=function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();v14PrayerIconTap(p.key)}};
+      el.dataset.v14Ready='1';
+    }
+    if(el.dataset.v14Sig===sig)return;
+    el.dataset.v14Sig=sig;
     el.classList.toggle('active-prayer',p.key===current);
     el.classList.toggle('qaza-prayer',st==='qaza');
     el.classList.toggle('complete-prayer',st==='complete'||st==='qaza-complete');
     el.title=p.bn+' • '+p.name+(st==='qaza'?' • Qaza':'');
-    el.setAttribute('role','button');
-    el.setAttribute('tabindex','0');
-    el.onclick=function(ev){ev.stopPropagation();v14PrayerIconTap(p.key)};
-    el.onkeydown=function(ev){
-      if(ev.key==='Enter'||ev.key===' '){
-        ev.preventDefault();
-        v14PrayerIconTap(p.key);
-      }
-    };
   });
 }
 v13UpdateOrbit=updateOrbitV14;
 
+function v14SetText(el,text){if(el&&el.textContent!==text)el.textContent=text}
 function syncHomeV14(){
+  var home=document.getElementById('page-home');if(!home||!home.classList.contains('active'))return;
   var ctx=prayerCycleContext(),next=v13NextPrayer(ctx),ms=Math.max(0,next.date-ctx.now);
-  var name=document.getElementById('v14NextPrayer'),count=document.getElementById('v14NextCount'),sub=document.getElementById('v14NextSub');
-  if(name)name.textContent=next.p.bn+' • '+next.p.name;
-  if(count)count.textContent=v13Duration(ms);
-  if(sub)sub.textContent='Starts '+formatTime(next.date)+' • '+(isBangladeshCoords(coords)?'Dhaka time':'local time');
-  var lt=document.getElementById('v14LocationText');if(lt)lt.textContent=locationLabel||'Location permission needed';
-  var mm=document.getElementById('v14MethodMini');if(mm)mm.textContent=(METHODS[settings.calcMethod]||METHODS.karachi).label+' • '+(settings.asrMethod==='hanafi'?'Hanafi':'Std');
+  v14SetText(document.getElementById('v14NextPrayer'),next.p.bn+' • '+next.p.name);
+  v14SetText(document.getElementById('v14NextCount'),v13Duration(ms));
+  v14SetText(document.getElementById('v14NextSub'),'Starts '+formatTime(next.date)+' • '+(isBangladeshCoords(coords)?'Dhaka time':'local time'));
+  v14SetText(document.getElementById('v14LocationText'),locationLabel||'Location permission needed');
+  v14SetText(document.getElementById('v14MethodMini'),(METHODS[settings.calcMethod]||METHODS.karachi).label+' • '+(settings.asrMethod==='hanafi'?'Hanafi':'Std'));
   updateOrbitV14(v13CurrentPrayer(ctx));
 }
 
@@ -138,12 +138,7 @@ showPage=function(name){
   if(name==='prayer')name='home';
   oldShowPageV14(name);
   document.querySelectorAll('#nav button').forEach(function(x){x.classList.toggle('active',x.dataset.page===name)});
-  if(name==='home'){
-    setTimeout(function(){
-      try{renderCalendar()}catch(e){}
-      syncHomeV14();
-    },0);
-  }
+  if(name==='home')requestAnimationFrame(syncHomeV14);
 };
 
 window.openGuidePageV13=function(){showPage('guide-v13')};
@@ -154,5 +149,4 @@ window.openGuidePageV13=function(){showPage('guide-v13')};
   installNavV14();
   try{renderCalendar()}catch(e){}
   syncHomeV14();
-  setInterval(syncHomeV14,1000);
 })();
