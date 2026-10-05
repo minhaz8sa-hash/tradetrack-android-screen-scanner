@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#07110f" />
+  <title>Namaz Orbit</title>
+  <link rel="stylesheet" href="style1.css">
+<link rel="stylesheet" href="style2.css">
+<link rel="stylesheet" href="style3.css">
+<link rel="stylesheet" href="style4.css">
+<link rel="stylesheet" href="style5.css">
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><div class="logo">☾</div><div><h1>Namaz Orbit</h1><small>Prayer • Quran • Qaza</small></div></div>
+    <button class="pill" onclick="detectLocation()">📍 Auto</button>
+  </header>
+
+  <main>
+    <section class="page active" id="page-home">
+      <div class="hero glass">
+        <div class="location"><div class="left"><b>Live location</b><span id="locationText">Location permission needed</span></div><span class="pill" id="methodChip">Karachi • Hanafi</span></div>
+        <div class="next"><div><small class="muted">NEXT PRAYER</small><h2 id="nextPrayer">—</h2></div><div class="count" id="countdown">--:--:--</div></div>
+        <div class="date-row"><span id="gregorianDate">—</span><span id="hijriDate">Hijri date loading…</span></div>
+      </div>
+
+      <div class="orbits">
+        <div class="orbit one">
+          <div class="orb-label">5 DAILY PRAYERS</div>
+          <span class="picon p1" title="Fajr">🌄</span><span class="picon p2" title="Dhuhr">☀️</span><span class="picon p3" title="Asr">🌤️</span><span class="picon p4" title="Maghrib">🌇</span><span class="picon p5" title="Isha">🌙</span>
+        </div>
+        <div class="orbit two"><div class="qbadge" id="qazaBadge">Qaza 0</div></div>
+        <div class="orbit-core glass"><div><small>Completed today</small><strong><span id="completeCount">0</span>/5</strong><small id="todayPercent">0% complete</small></div></div>
+      </div>
+
+      <div class="grid">
+        <div class="stat glass"><small>Completed</small><b id="statComplete">0</b></div>
+        <div class="stat glass"><small>Qaza due</small><b id="statQaza">0</b></div>
+        <div class="stat glass"><small>Next in</small><b id="statNext">—</b></div>
+        <div class="stat glass"><small>Location</small><b id="statLoc" style="font-size:16px">Auto</b></div>
+      </div>
+
+      <div class="section-title"><h3>আজকের নামাজ</h3><button onclick="showPage('prayer')">Calendar →</button></div>
+      <div class="prayer-list" id="todayPrayerList"></div>
+    </section>
+
+    <section class="page" id="page-prayer">
+      <div class="panel glass">
+        <div class="calendar-head"><button class="btn" onclick="shiftMonth(-1)">‹</button><h3 id="calTitle">Calendar</h3><button class="btn" onclick="shiftMonth(1)">›</button></div>
+        <div class="calendar" id="calendar"></div>
+      </div>
+      <div class="panel glass"><h3 id="selectedDateTitle">Selected day</h3><div id="selectedDayDetails" class="prayer-list"></div></div>
+      <div class="panel glass"><h3>Prayer time engine</h3><div class="notice">Times are calculated from your device location and timezone. Calculation conventions differ by region and mosque; use Settings to select method, Asr convention, and a minute adjustment.</div></div>
+    </section>
+
+    <section class="page" id="page-quran">
+      <div class="panel glass">
+        <div class="quran-toolbar"><input class="control" id="quranSearch" placeholder="Surah search…" oninput="renderSurahList()"><button class="btn" onclick="downloadQuranOffline()">⬇ Offline</button></div>
+        <div class="progress"><span id="quranDownloadProgress"></span></div><small class="muted" id="quranDownloadLabel">Arabic Uthmani + বাংলা অর্থ; downloaded Surahs stay cached on this device.</small>
+      </div>
+      <div class="panel glass" id="surahBrowser"><h3>Quran</h3><div class="surah-list" id="surahList"></div></div>
+      <div class="panel glass" id="surahReader" style="display:none"><div class="section-title" style="margin-top:0"><h3 id="surahTitle">Surah</h3><button onclick="closeSurah()">← সব সূরা</button></div><div id="ayahList"></div><div class="notice">বাংলা অংশটি অনুবাদ/অর্থ হিসেবে দেখানো হচ্ছে। এটি AI-generated tafsir নয়। ব্যাখ্যা বা tafsir যোগ করলে verified scholarly source ব্যবহার করা উচিত।</div></div>
+    </section>
+
+    <section class="page" id="page-qaza">
+      <div class="grid">
+        <div class="stat glass"><small>Total Qaza due</small><b id="qazaTotal">0</b></div>
+        <div class="stat glass"><small>Qaza completed</small><b id="qazaDone">0</b></div>
+      </div>
+      <div class="section-title"><h3>Qaza queue</h3><button onclick="renderQaza()">Refresh</button></div>
+      <div id="qazaList"></div>
+      <div class="panel glass"><div class="notice">App status is a personal tracker. If a prayer was actually completed but not logged, mark it complete instead of treating the app’s automatic state as a religious ruling.</div></div>
+    </section>
+
+    <section class="page" id="page-more">
+      <div class="panel glass"><h3>Namaz Guide</h3><div class="guide-grid" id="guideGrid"></div></div>
+      <div class="panel glass"><h3>Settings</h3><div class="controls">
+        <label class="control-label">Calculation method<select class="control" id="calcMethod"><option value="karachi">University of Islamic Sciences, Karachi</option><option value="mwl">Muslim World League</option><option value="egypt">Egyptian General Authority</option><option value="isna">ISNA</option></select></label>
+        <label class="control-label">Asr calculation<select class="control" id="asrMethod"><option value="hanafi">Hanafi (shadow factor 2)</option><option value="standard">Standard (shadow factor 1)</option></select></label>
+        <label class="control-label">Time adjustment (minutes)<input class="control" id="timeAdjustment" type="number" min="-30" max="30" value="0"></label>
+        <label class="control-label">Alarm sound<select class="control" id="alarmSound"><option value="alarm">System alarm sound</option><option value="notification">Notification sound</option><option value="silent">Vibration / silent</option></select></label>
+        <label class="control-label">Pre-prayer reminder<select class="control" id="preReminder"><option value="0">Off</option><option value="5">5 minutes before</option><option value="10">10 minutes before</option><option value="15">15 minutes before</option><option value="30">30 minutes before</option></select></label>
+        <button class="btn primary full" onclick="saveSettings()">Save & reschedule alarms</button>
+        <button class="btn full" onclick="requestExactAlarm()">Enable exact alarm access</button>
+      </div></div>
+      <div class="panel glass"><h3>Privacy & data</h3><div class="row"><div><b>Local-first history</b><div class="meta">Prayer status stays on this device.</div></div><button class="btn" onclick="exportData()">Export</button></div><div class="row"><div><b>Reset tracker</b><div class="meta">Deletes prayer/Qaza history on this device.</div></div><button class="btn danger" onclick="resetTracker()">Reset</button></div></div>
+    </section>
+  </main>
+</div>
+
+<nav class="nav glass" id="nav">
+  <button class="active" data-page="home" onclick="showPage('home')"><i>⌂</i>Home</button>
+  <button data-page="prayer" onclick="showPage('prayer')"><i>🕌</i>Prayer</button>
+  <button data-page="quran" onclick="showPage('quran')"><i>📖</i>Quran</button>
+  <button data-page="qaza" onclick="showPage('qaza')"><i>↺</i>Qaza</button>
+  <button data-page="more" onclick="showPage('more')"><i>☰</i>More</button>
+</nav>
+
+<div class="modal" id="guideModal" onclick="if(event.target===this) closeGuide()"><div class="sheet"><div class="sheet-head"><h3 id="guideTitle">Guide</h3><button class="btn" onclick="closeGuide()">✕</button></div><div id="guideBody"></div></div></div>
+
+<script src="app1.js"></script>
+<script src="app2.js"></script>
+<script src="app3.js"></script>
+<script src="app4.js"></script>
+<script src="app5.js"></script>
+</body>
+</html>
