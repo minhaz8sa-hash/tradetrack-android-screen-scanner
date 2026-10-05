@@ -139,8 +139,6 @@ showPage=function(name){
   if(name==='home')requestAnimationFrame(syncHomeV14);
 };
 
-window.openGuidePageV13=function(){showPage('guide-v13')};
-
 (function initV14(){
   if(window.AndroidBridge)document.documentElement.classList.add('native-perf');
   installHomeTopV14();
