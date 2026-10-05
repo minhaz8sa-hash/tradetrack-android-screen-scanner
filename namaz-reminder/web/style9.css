@@ -182,3 +182,53 @@ html.native-perf .app{position:relative;z-index:1}
   -webkit-backdrop-filter:blur(5px) saturate(112%)!important;
   backdrop-filter:blur(5px) saturate(112%)!important;
 }
+
+
+/* v1.5.5 — Orbit always renders above Home modules */
+#page-home{
+  position:relative;
+  isolation:isolate;
+}
+#page-home .home-next-v14,
+#homeNextV14{
+  position:relative!important;
+  z-index:4!important;
+}
+#coreLocationPanelV15,
+#corePrayerPanelV15,
+#homeCalendarV14{
+  position:relative!important;
+  z-index:3!important;
+}
+#page-home .orbits{
+  position:relative!important;
+  z-index:30!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+  isolation:isolate;
+}
+#page-home .orbit.one{
+  z-index:32!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+}
+#page-home .orbit.two{
+  z-index:33!important;
+  overflow:visible!important;
+  pointer-events:none!important;
+}
+#page-home .orbit-core{
+  z-index:34!important;
+  pointer-events:auto!important;
+}
+#page-home .orbit.one .picon,
+#page-home .qaza-orbit-icon{
+  z-index:40!important;
+  pointer-events:auto!important;
+}
+#page-home .orbit.one .picon,
+#page-home .qaza-orbit-icon,
+#page-home .orbit-core{
+  transform-style:preserve-3d;
+  backface-visibility:hidden;
+}
