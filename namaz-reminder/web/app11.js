@@ -32,9 +32,13 @@ function installNav151(){
     '<button data-page="qaza" onclick="showPage(\'qaza\')"><i>'+v13Svg('qaza')+'</i>Qaza</button>'+
     '<button data-page="more" onclick="showPage(\'more\')"><i>'+v13Svg('more')+'</i>More</button>';
 }
+var qazaOrbitSig151='';
 function renderQazaOrbit151(){
   var ring=document.querySelector('.orbit.two');if(!ring)return;
   var queue=typeof qazaQueue==='function'?qazaQueue():[];
+  var sig=queue.slice(0,5).map(function(q){return q.dateKey+'|'+q.prayer.key}).join(',');
+  if(sig===qazaOrbitSig151&&ring.dataset.qazaReady==='1')return;
+  qazaOrbitSig151=sig;ring.dataset.qazaReady='1';
   ring.innerHTML='';
   if(!queue.length){
     var empty=document.createElement('div');empty.className='qaza-empty-orbit';empty.textContent='QAZA CLEAR';ring.appendChild(empty);return;
