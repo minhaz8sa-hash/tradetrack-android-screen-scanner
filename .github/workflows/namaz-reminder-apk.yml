@@ -42,13 +42,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.1.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.2.0.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.1.0
-          path: namaz-reminder/Namaz-Orbit-v1.1.0.apk
+          name: Namaz-Orbit-v1.2.0
+          path: namaz-reminder/Namaz-Orbit-v1.2.0.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -57,7 +57,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.1.0 --yes || true
-          git tag -d v1.1.0 2>/dev/null || true
-          git push origin :refs/tags/v1.1.0 2>/dev/null || true
-          gh release create v1.1.0 Namaz-Orbit-v1.1.0.apk --target main --title "Namaz Orbit v1.1.0" --notes "Test alarm + vibration, Bangla Quran pronunciation aid, prayer end countdown/reminders, serial Qaza suggestions, redesigned prayer icons/current-prayer glow, and live Qibla compass."
+          gh release delete v1.2.0 --yes || true
+          git tag -d v1.2.0 2>/dev/null || true
+          git push origin :refs/tags/v1.2.0 2>/dev/null || true
+          gh release create v1.2.0 Namaz-Orbit-v1.2.0.apk --target main --title "Namaz Orbit v1.2.0" --notes "Islamic Live Events with Ramadan/Eid/Arafah/Ashura countdowns, plus prior v1.1 prayer, Quran, Qaza, alarm and Qibla upgrades."
