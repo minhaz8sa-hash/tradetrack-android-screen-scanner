@@ -1,0 +1,28 @@
+
+.guide-launch{display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.guide-launch .gicon{width:50px;height:50px;border-radius:17px;display:grid;place-items:center;background:rgba(142,240,207,.08);border:1px solid rgba(142,240,207,.18)}
+.guide-launch .gicon svg{width:30px;height:30px;stroke:var(--accent);fill:none;stroke-width:1.7}
+.guide-list-v13{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.guide-card-v13{padding:15px;border-radius:19px;border:1px solid var(--line);background:var(--glass);color:var(--text);text-align:left}
+.guide-card-v13 b{display:block;font-size:15px}.guide-card-v13 small{color:var(--muted);line-height:1.5}
+.demo-stage{height:220px;border-radius:25px;background:radial-gradient(circle at 50% 80%,rgba(142,240,207,.09),transparent 48%),rgba(255,255,255,.025);border:1px solid var(--line);position:relative;overflow:hidden;display:grid;place-items:center;margin:12px 0}
+.demo-mat{position:absolute;width:180px;height:62px;border-radius:50%;bottom:20px;background:rgba(142,240,207,.08);border:1px solid rgba(142,240,207,.16);transform:perspective(150px) rotateX(55deg)}
+.salah-person{position:relative;width:110px;height:155px;transition:all .7s ease;z-index:2}
+.salah-person .head{position:absolute;width:29px;height:29px;border-radius:50%;background:#d8eadf;left:41px;top:7px;transition:.7s}
+.salah-person .body{position:absolute;width:10px;height:67px;border-radius:8px;background:#8ef0cf;left:50px;top:36px;transform-origin:top;transition:.7s}
+.salah-person .arm,.salah-person .leg{position:absolute;height:8px;border-radius:8px;background:#b8d9ce;transform-origin:left center;transition:.7s}
+.salah-person .arm.a1{width:47px;left:54px;top:49px;transform:rotate(72deg)}.salah-person .arm.a2{width:47px;left:55px;top:50px;transform:rotate(108deg)}
+.salah-person .leg.l1{width:58px;left:54px;top:98px;transform:rotate(75deg)}.salah-person .leg.l2{width:58px;left:53px;top:98px;transform:rotate(105deg)}
+.salah-person.ruku{transform:translateY(10px)}.salah-person.ruku .body{transform:rotate(90deg)}.salah-person.ruku .head{left:94px;top:34px}
+.salah-person.ruku .arm.a1{left:78px;top:55px;transform:rotate(55deg)}.salah-person.ruku .arm.a2{left:80px;top:57px;transform:rotate(112deg)}
+.salah-person.sujood{transform:translateY(62px) scale(.95)}.salah-person.sujood .body{left:42px;top:45px;transform:rotate(78deg)}.salah-person.sujood .head{left:88px;top:64px}
+.salah-person.sujood .arm.a1{left:68px;top:74px;transform:rotate(28deg)}.salah-person.sujood .arm.a2{left:69px;top:80px;transform:rotate(150deg)}
+.salah-person.sujood .leg.l1{left:37px;top:88px;transform:rotate(147deg)}.salah-person.sujood .leg.l2{left:37px;top:94px;transform:rotate(35deg)}
+.salah-person.sitting{transform:translateY(45px)}.salah-person.sitting .leg.l1{left:53px;top:98px;transform:rotate(12deg)}.salah-person.sitting .leg.l2{left:53px;top:104px;transform:rotate(168deg)}
+.demo-caption{text-align:center;color:var(--accent);font-weight:700}.guide-section{padding:14px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.guide-section h4{margin:0 0 7px}.guide-section p{color:#d9e8e3;line-height:1.65;font-size:13px}
+.recite-box{margin-top:9px;padding:12px;border-radius:16px;background:rgba(142,240,207,.035);border:1px solid rgba(142,240,207,.12)}
+.recite-box .ar{font-family:"Noto Naskh Arabic","Scheherazade New",serif;font-size:25px;line-height:1.9;text-align:right;direction:rtl}
+.recite-box .pron{color:#d9fff1;line-height:1.7;margin-top:7px}.recite-box .pron:before{content:"বাংলা উচ্চারণ";display:block;color:var(--accent);font-size:9px;letter-spacing:.6px;margin-bottom:3px}
+.recite-box .meaning{color:var(--muted);font-size:11px;line-height:1.55;margin-top:6px}.guide-warning{font-size:10px;color:var(--muted);line-height:1.55;margin-top:10px}
+@media(max-width:390px){.guide-list-v13{grid-template-columns:1fr}.demo-stage{height:200px}}
