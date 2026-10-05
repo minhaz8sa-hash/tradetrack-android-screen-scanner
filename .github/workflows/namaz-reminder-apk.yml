@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'namaz-reminder/**'
+      - 'namaz-reminder/RELEASE'
       - '.github/workflows/namaz-reminder-apk.yml'
   workflow_dispatch:
 
 
 concurrency:
-  group: namaz-orbit-performance-v142
+  group: namaz-orbit-apk-release
   cancel-in-progress: true
 
 permissions:
