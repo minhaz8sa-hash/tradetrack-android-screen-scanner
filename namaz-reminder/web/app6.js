@@ -120,6 +120,7 @@ function renderIslamicEvents(){
   renderLiveEventHome();
 }
 function tickIslamicEvents(){
+  const page=document.getElementById('page-events');if(!page||!page.classList.contains('active'))return;
   const now=new Date();if(liveEventState.dayKey!==eventDayKey(now)){renderIslamicEvents();return}
   const m=eventHomeModel(),home=document.getElementById('homeEventCountdown'),label=document.getElementById('homeEventLabel');
   if(home)home.textContent=m.mode==='next'||m.mode==='ramadan'?m.count:'LIVE TODAY';if(label)label.textContent=m.label;
@@ -130,6 +131,6 @@ function tickIslamicEvents(){
 function openIslamicEvents(){renderIslamicEvents();showPage('events')}
 
 (function initIslamicLiveEvents(){
-  installIslamicEventsUI();buildLiveEventState();renderLiveEventHome();renderIslamicEvents();
+  installIslamicEventsUI();
   setInterval(tickIslamicEvents,1000);
 })();
