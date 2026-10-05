@@ -51,10 +51,8 @@ function scrollHomeTopV14(){
 function installNavV14(){
   var nav=document.getElementById('nav');if(!nav)return;
   nav.innerHTML='<button class="active" data-page="home" onclick="showPage(\'home\')"><i>'+v13Svg('home')+'</i>Home</button>'+
-    '<button data-page="guide-v13" onclick="showPage(\'guide-v13\')"><i>'+v13Svg('prayer')+'</i>Guide</button>'+
     '<button data-page="quran" onclick="showPage(\'quran\')"><i>'+v13Svg('quran')+'</i>Quran</button>'+
     '<button data-page="qaza" onclick="showPage(\'qaza\')"><i>'+v13Svg('qaza')+'</i>Qaza</button>'+
-    '<button data-page="events" onclick="openIslamicEvents()"><i>'+v13Svg('events')+'</i>Events</button>'+
     '<button data-page="more" onclick="showPage(\'more\')"><i>'+v13Svg('more')+'</i>More</button>';
 }
 
@@ -148,6 +146,7 @@ window.openGuidePageV13=function(){showPage('guide-v13')};
   installHomeTopV14();
   mergePrayerCalendarIntoHomeV14();
   installNavV14();
-  try{renderCalendar()}catch(e){}
   syncHomeV14();
+  var idle=window.requestIdleCallback||function(fn){return setTimeout(fn,700)};
+  idle(function(){try{renderCalendar()}catch(e){}},{timeout:1500});
 })();
