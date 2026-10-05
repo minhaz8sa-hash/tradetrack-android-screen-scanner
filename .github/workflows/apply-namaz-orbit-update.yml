@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'namaz-reminder/update_payload.b64'
+      - 'namaz-reminder/update_payload.part5'
   workflow_dispatch:
 
 permissions:
@@ -22,11 +22,11 @@ jobs:
       - name: Apply verified v1.1.0 source payload
         shell: bash
         run: |
-          base64 -d namaz-reminder/update_payload.b64 > /tmp/namaz-update.tar.gz
+          cat namaz-reminder/update_payload.part1 namaz-reminder/update_payload.part2 namaz-reminder/update_payload.part3 namaz-reminder/update_payload.part4 namaz-reminder/update_payload.part5 | base64 -d > /tmp/namaz-update.tar.gz
           sha256sum /tmp/namaz-update.tar.gz
           tar -tzf /tmp/namaz-update.tar.gz >/dev/null
           tar -xzf /tmp/namaz-update.tar.gz -C .
-          rm namaz-reminder/update_payload.b64
+          rm -f namaz-reminder/update_payload.b64 namaz-reminder/update_payload.part1 namaz-reminder/update_payload.part2 namaz-reminder/update_payload.part3 namaz-reminder/update_payload.part4 namaz-reminder/update_payload.part5
 
       - name: Commit source update
         shell: bash
