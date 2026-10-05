@@ -202,10 +202,6 @@ function coreRefreshV15(){
   updateCoreLocationUIV15();
   updateCoreAlarmUIV15();
   if(window.AndroidBridge)startLiveLocationV15();
-  setTimeout(function(){
-    v13AlarmScheduleSignature='';
-    scheduleAlarmsV13(true);
-  },800);
   setInterval(function(){if(!document.hidden)coreRefreshV15()},5000);
   document.addEventListener('visibilitychange',function(){
     if(document.hidden)return;
