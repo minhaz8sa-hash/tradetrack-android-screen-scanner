@@ -57,6 +57,7 @@ function openGuidePageV13(){showPage('guide-v13');document.querySelectorAll('#na
 var demoStepsV13=[['','কিয়াম • দাঁড়ানো'],['ruku','রুকু'],['','কাওমা • সোজা দাঁড়ানো'],['sujood','সিজদা'],['sitting','জলসা • বসা'],['sujood','দ্বিতীয় সিজদা']];
 var demoIndexV13=0;
 function tickGuideDemoV13(){
+  var page=document.getElementById('page-guide-v13');if(!page||!page.classList.contains('active')||document.hidden)return;
   var p=document.getElementById('salahPersonV13'),c=document.getElementById('demoCaptionV13');if(!p||!c)return;
   var x=demoStepsV13[demoIndexV13%demoStepsV13.length];p.className='salah-person '+x[0];c.textContent=x[1];demoIndexV13++;
 }
