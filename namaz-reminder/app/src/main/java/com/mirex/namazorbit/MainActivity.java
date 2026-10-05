@@ -32,11 +32,14 @@ public class MainActivity extends Activity implements SensorEventListener {
     private Sensor rotationSensor;
     private volatile Double compassLat = null;
     private volatile Double compassLon = null;
+    private long lastCompassDispatchMs = 0L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         web = new WebView(this);
+        web.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+        web.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
         setContentView(web);
 
         WebSettings s = web.getSettings();
@@ -74,7 +77,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     protected void onResume() {
         super.onResume();
-        if (rotationSensor != null) sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_UI);
+        if (rotationSensor != null) sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     @Override
@@ -106,6 +109,9 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() != Sensor.TYPE_ROTATION_VECTOR || web == null) return;
+        long nowMs = android.os.SystemClock.elapsedRealtime();
+        if (nowMs - lastCompassDispatchMs < 140L) return;
+        lastCompassDispatchMs = nowMs;
         float[] matrix = new float[9];
         float[] orientation = new float[3];
         SensorManager.getRotationMatrixFromVector(matrix, event.values);
