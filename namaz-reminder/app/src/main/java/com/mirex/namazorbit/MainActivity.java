@@ -61,11 +61,13 @@ public class MainActivity extends Activity implements SensorEventListener {
                 }
             }
         });
+
         web.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
         requestNotificationPermission();
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+
         web.loadUrl("file:///android_asset/index.html");
     }
 
@@ -95,6 +97,9 @@ public class MainActivity extends Activity implements SensorEventListener {
             geoCallback.invoke(geoOrigin, granted, false);
             geoCallback = null;
             geoOrigin = null;
+            if (granted && web != null) {
+                web.post(() -> web.evaluateJavascript("window.hideLocationOnboarding && window.hideLocationOnboarding();", null));
+            }
         }
     }
 
@@ -142,14 +147,16 @@ public class MainActivity extends Activity implements SensorEventListener {
 
         @JavascriptInterface
         public void testAlarm(String soundType, boolean vibrate) {
-            AlarmScheduler.schedule(context,
+            AlarmScheduler.schedule(
+                    context,
                     "NO_TEST_" + System.currentTimeMillis(),
                     "Namaz Orbit • Test Alarm",
                     "Alarm sound ও vibration test successful.",
                     System.currentTimeMillis() + 3000,
                     soundType == null ? "alarm" : soundType,
                     vibrate,
-                    false);
+                    false
+            );
         }
 
         @JavascriptInterface
@@ -159,13 +166,36 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
         @JavascriptInterface
+        public boolean hasFineLocationPermission() {
+            return Build.VERSION.SDK_INT < 23 ||
+                    context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public boolean hasBackgroundLocationPermission() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return hasFineLocationPermission();
+            return context.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public void openAppLocationSettings() {
+            try {
+                Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + context.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
         public void requestExactAlarmPermission() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
                 if (!am.canScheduleExactAlarms()) {
                     try {
-                        Intent i = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
-                                Uri.parse("package:" + context.getPackageName()));
+                        Intent i = new Intent(
+                                Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
+                                Uri.parse("package:" + context.getPackageName())
+                        );
                         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         context.startActivity(i);
                     } catch (Exception ignored) {}
