@@ -40,9 +40,9 @@
     var c2x=r2.left-pr.left+r2.width/2, c2y=r2.top-pr.top+r2.height/2;
 
     // Keep icons fully inside the visible page width while still visually riding the rings.
-    var sideSafe=Math.max(24,Math.min(c1x,pr.width-c1x)-28);
-    var outerR=Math.min(r1.width/2-5,sideSafe);
-    var innerR=Math.max(76,Math.min(r2.width/2-10,Math.min(c2x,pr.width-c2x)-24));
+    var sideSafe=Math.max(24,Math.min(c1x,pr.width-c1x)-32);
+    var outerR=Math.max(80,Math.min(r1.width/2-32,sideSafe));
+    var innerR=Math.max(64,Math.min(r2.width/2-28,Math.min(c2x,pr.width-c2x)-28));
 
     metrics={c1x:c1x,c1y:c1y,c2x:c2x,c2y:c2y,outerR:outerR,innerR:innerR};
   }
@@ -85,6 +85,7 @@
     qazaButtons=[];
     if(!portal)return;
     portal.classList.toggle('dense',queue.length>8);
+    portal.classList.toggle('very-dense',queue.length>20);
     queue.forEach(function(q){
       var b=document.createElement('button');
       b.className='orbit-portal-icon156 qaza-history';
