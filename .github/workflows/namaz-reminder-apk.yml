@@ -5,13 +5,12 @@ on:
     branches: [main]
     paths:
       - 'namaz-reminder/RELEASE'
-      - '.github/workflows/namaz-reminder-apk.yml'
   workflow_dispatch:
 
 
 concurrency:
   group: namaz-orbit-apk-release
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
