@@ -1,44 +1,75 @@
-name: Build Android Scanner APK
+name: Build Android APKs
 
 on:
   workflow_dispatch:
   push:
     paths:
       - "android-screen-scanner/**"
+      - "bnb-pay-apk/**"
+      - ".github/workflows/build-apk.yml"
   pull_request:
     paths:
       - "android-screen-scanner/**"
+      - "bnb-pay-apk/**"
+      - ".github/workflows/build-apk.yml"
 
 jobs:
-  build:
+  tradetrack:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: android-screen-scanner
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
+      - uses: actions/checkout@v4
+      - id: check
+        run: test -d . && echo "exists=true" >> "$GITHUB_OUTPUT" || echo "exists=false" >> "$GITHUB_OUTPUT"
+      - if: steps.check.outputs.exists == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Set up Gradle 8.9
+      - if: steps.check.outputs.exists == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-
-      - name: Build debug APK
+      - if: steps.check.outputs.exists == 'true'
+        name: Build TradeTrack debug APK
         run: gradle :app:assembleDebug --stacktrace
-
-      - name: Upload APK artifact
+      - if: steps.check.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: TradeTrack-Android-Screen-Scanner
           path: android-screen-scanner/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  bnb_pay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        shell: bash
+        run: |
+          if [ -d "bnb-pay-apk" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.check.outputs.exists == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - if: steps.check.outputs.exists == 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - if: steps.check.outputs.exists == 'true'
+        name: Build BNB PAY demo APK
+        working-directory: bnb-pay-apk
+        run: gradle :app:assembleDebug --stacktrace
+      - if: steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BNB-PAY-Demo-APK
+          path: bnb-pay-apk/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
