@@ -33,7 +33,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
                 0, 700, 300, 700, 300, 900,
                 450, 700, 300, 700, 300, 900
         };
-        vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1));
+        vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
     }
 
     private static void stopAlarmVibration(Context context) {
@@ -117,6 +117,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
                 .setContentText(body)
                 .setStyle(new Notification.BigTextStyle().bigText(body))
                 .setContentIntent(content)
+                .setDeleteIntent(dismissPending)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .setPriority(Notification.PRIORITY_MAX)
