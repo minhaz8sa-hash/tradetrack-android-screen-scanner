@@ -23,6 +23,7 @@ import com.mirex.body.agent.ChatRole
 import com.mirex.body.cloud.CloudSkillStore
 import com.mirex.body.cloud.VeyraCloudClient
 import com.mirex.body.skills.LocalSkillEngine
+import com.mirex.body.language.MultilingualCommandEngine
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -39,6 +40,7 @@ import kotlin.coroutines.resume
 class MirexAccessibilityService : AccessibilityService() {
 
     data class ScreenFrame(val base64Jpeg: String, val width: Int, val height: Int)
+    data class OcrItem(val text: String, val bounds: Rect)
 
     companion object {
         @Volatile var instance: MirexAccessibilityService? = null
@@ -91,7 +93,10 @@ class MirexAccessibilityService : AccessibilityService() {
                 val store = CloudSkillStore(this@MirexAccessibilityService)
                 VeyraCloudClient(this@MirexAccessibilityService).syncSkills(force = false)
 
-                val local = LocalSkillEngine(this@MirexAccessibilityService, store).execute(task)
+                val normalized = MultilingualCommandEngine().normalize(task)
+                AgentBus.status("Local · " + normalized.detectedLanguage)
+                val local = LocalSkillEngine(this@MirexAccessibilityService, store)
+                    .execute(task, normalized.english)
                 if (local.handled) {
                     val reply = local.message.ifBlank {
                         if (local.success) "Local task complete হয়েছে।" else "Local task complete করা যায়নি।"
@@ -196,6 +201,48 @@ class MirexAccessibilityService : AccessibilityService() {
         if (clickText(query)) return true
         val bounds = findTextBoundsByOcr(query) ?: return false
         return tap(bounds.exactCenterX(), bounds.exactCenterY())
+    }
+
+
+    suspend fun ocrItems(): List<OcrItem> {
+        val frame = screenshot() ?: return emptyList()
+        val bytes = runCatching {
+            android.util.Base64.decode(frame.base64Jpeg, android.util.Base64.NO_WRAP)
+        }.getOrNull() ?: return emptyList()
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return emptyList()
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+        val image = InputImage.fromBitmap(bitmap, 0)
+
+        return suspendCancellableCoroutine { cont ->
+            recognizer.process(image)
+                .addOnSuccessListener { result ->
+                    val out = mutableListOf<OcrItem>()
+                    for (block in result.textBlocks) {
+                        for (line in block.lines) {
+                            val box = line.boundingBox ?: continue
+                            val text = line.text.trim()
+                            if (text.isNotBlank()) out += OcrItem(text, Rect(box))
+                        }
+                    }
+                    if (cont.isActive) cont.resume(out)
+                }
+                .addOnFailureListener {
+                    if (cont.isActive) cont.resume(emptyList())
+                }
+                .addOnCompleteListener {
+                    bitmap.recycle()
+                    recognizer.close()
+                }
+        }
+    }
+
+    suspend fun swipePageUp(): Boolean {
+        if (scroll("forward")) return true
+        val metrics = resources.displayMetrics
+        val x = metrics.widthPixels * 0.52f
+        val y1 = metrics.heightPixels * 0.78f
+        val y2 = metrics.heightPixels * 0.34f
+        return swipe(x, y1, x, y2, 420L)
     }
 
     private suspend fun findTextBoundsByOcr(query: String): Rect? {
