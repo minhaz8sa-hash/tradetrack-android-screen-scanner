@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - veyra-v0.4-multilingual-freefire
+      - veyra-v0.5-teach-visual
     paths:
       - 'mirex-body/**'
       - '.github/workflows/mirex-body-build.yml'
@@ -42,8 +42,8 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Veyra-v0.4-debug
+          name: Veyra-v0.5-debug
           path: mirex-body/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-# v0.4 multilingual + Free Fire guild collector build
+# v0.5 teach + visual anchor build
