@@ -208,7 +208,7 @@ class FreeFireGuildCollector(
 
         val learnedActivity = anchorStore.load("activity_point")
         val activityColumnX = learnedActivity?.let {
-            it.normX * it.screenWidth
+            it.normX.toDouble() * it.screenWidth.toDouble()
         } ?: numeric
             .groupBy { (item, _) -> item.bounds.centerX() / 80 }
             .maxByOrNull { it.value.size }
@@ -219,7 +219,7 @@ class FreeFireGuildCollector(
 
         val tolerance = if (learnedActivity != null) 150.0 else 100.0
         val activityItems = numeric.filter { (item, _) ->
-            abs(item.bounds.centerX() - activityColumnX) <= tolerance
+            abs(item.bounds.centerX().toDouble() - activityColumnX) <= tolerance
         }
 
         val ignored = listOf(
