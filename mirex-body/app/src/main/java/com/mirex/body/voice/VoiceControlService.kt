@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
 import android.os.IBinder
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -51,6 +52,8 @@ class VoiceControlService : Service(), RecognitionListener {
     private var speaking = false
     private var restartJob: Job? = null
     private val utteranceCounter = AtomicInteger(0)
+    private var autoLanguageEnabled = Build.VERSION.SDK_INT >= 34
+    private var detectedLanguageTag: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -190,9 +193,17 @@ class VoiceControlService : Service(), RecognitionListener {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "bn-BD")
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "bn-BD")
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, packageName)
+
+            if (Build.VERSION.SDK_INT >= 34 && autoLanguageEnabled) {
+                putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                putExtra(
+                    RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH,
+                    RecognizerIntent.LANGUAGE_SWITCH_BALANCED
+                )
+            } else {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+            }
         }
 
         runCatching {
@@ -289,6 +300,17 @@ class VoiceControlService : Service(), RecognitionListener {
     override fun onError(error: Int) {
         listening = false
         if (!active.value || AgentBus.running.value || speaking) return
+
+        if (Build.VERSION.SDK_INT >= 34 &&
+            (error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+                error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+        ) {
+            autoLanguageEnabled = false
+            status.value = "Language auto-switch unavailable · using device language"
+            scheduleListening(500L)
+            return
+        }
+
         val retry = when (error) {
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 1200L
             SpeechRecognizer.ERROR_NO_MATCH,
@@ -296,6 +318,22 @@ class VoiceControlService : Service(), RecognitionListener {
             else -> 800L
         }
         scheduleListening(retry)
+    }
+
+    override fun onLanguageDetection(results: Bundle) {
+        if (Build.VERSION.SDK_INT < 34) return
+        val tag = results.getString(SpeechRecognizer.DETECTED_LANGUAGE).orEmpty()
+        if (tag.isBlank()) return
+
+        detectedLanguageTag = tag
+        status.value = "Hearing · " + tag
+
+        val engine = tts ?: return
+        val locale = Locale.forLanguageTag(tag)
+        val availability = engine.isLanguageAvailable(locale)
+        if (availability >= TextToSpeech.LANG_AVAILABLE) {
+            engine.language = locale
+        }
     }
 
     override fun onResults(results: Bundle?) {
