@@ -16,21 +16,43 @@ class LocalSkillEngine(
         val message: String = ""
     )
 
-    suspend fun execute(command: String): Result {
+    suspend fun execute(command: String, englishCommand: String = command): Result {
         val clean = command.trim()
+        val english = englishCommand.trim()
         if (clean.isBlank()) return Result(false)
 
-        nativeNavigation(clean)?.let { return it }
-        nativeWebSearch(clean)?.let { return it }
-        nativeUrl(clean)?.let { return it }
-        nativeClick(clean)?.let { return it }
-        nativeType(clean)?.let { return it }
-        nativeOpenApp(clean)?.let { return it }
+        if (looksLikeFreeFireGuildTask(clean, english)) {
+            val collected = FreeFireGuildCollector(phone).run()
+            return Result(true, collected.success, collected.message)
+        }
 
-        val fromCloud = executeCloudSkill(clean)
-        if (fromCloud.handled) return fromCloud
+        val candidates = listOf(clean, english).filter { it.isNotBlank() }.distinct()
+
+        for (candidate in candidates) {
+            nativeNavigation(candidate)?.let { return it }
+            nativeWebSearch(candidate)?.let { return it }
+            nativeUrl(candidate)?.let { return it }
+            nativeClick(candidate)?.let { return it }
+            nativeType(candidate)?.let { return it }
+            nativeOpenApp(candidate)?.let { return it }
+        }
+
+        for (candidate in candidates.reversed()) {
+            val fromCloud = executeCloudSkill(candidate)
+            if (fromCloud.handled) return fromCloud
+        }
 
         return Result(false)
+    }
+
+    private fun looksLikeFreeFireGuildTask(original: String, english: String): Boolean {
+        val combined = normalize(original + " " + english)
+        val freeFire = combined.contains("free fire") || combined.contains("freefire")
+        val guildIntent = listOf(
+            "guild", "member", "members", "activity", "activity point",
+            "uid", "roster", "list", "গিল্ড", "মেম্বার", "অ্যাক্টিভিটি"
+        ).any { combined.contains(normalize(it)) }
+        return freeFire && guildIntent
     }
 
     private fun nativeNavigation(command: String): Result? {
@@ -142,6 +164,10 @@ class LocalSkillEngine(
                 "open_app_from_command" -> nativeOpenApp(command)?.let { return it }
                 "open_url_from_command" -> nativeUrl(command)?.let { return it }
                 "modal_handler" -> return handleModal()
+                "freefire_guild_collect" -> {
+                    val collected = FreeFireGuildCollector(phone).run()
+                    return Result(true, collected.success, collected.message)
+                }
             }
 
             val actions = skill.optJSONArray("actions")
