@@ -106,7 +106,7 @@ class FreeFireTeachSession(
             }
         }
 
-        val cancel = TextView(phone).apply {
+        val cancelButton = TextView(phone).apply {
             text = "CANCEL"
             textSize = 13f
             setTextColor(Color.WHITE)
@@ -116,7 +116,7 @@ class FreeFireTeachSession(
         }
 
         controls.addView(pause)
-        controls.addView(cancel)
+        controls.addView(cancelButton)
 
         val bottomParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
