@@ -25,7 +25,7 @@ class VisualAnchorStore(context: Context) {
     fun has(key: String): Boolean = prefs.contains(key)
 
     fun clearFreeFire() {
-        listOf("guild_button", "members_button", "activity_point", "member_row", "uid_field")
+        listOf("guild_button", "members_button", "activity_point", "member_row", "profile_button", "uid_field")
             .forEach { prefs.edit().remove(it).apply() }
     }
 
