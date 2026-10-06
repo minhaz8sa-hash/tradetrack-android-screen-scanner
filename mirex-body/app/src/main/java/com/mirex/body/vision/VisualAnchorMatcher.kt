@@ -43,35 +43,37 @@ class VisualAnchorMatcher(
             val minY = max(halfH, expectedY - radiusY)
             val maxY = min(screen.height - halfH - 1, expectedY + radiusY)
 
-            if (minX >= maxX || minY >= maxY) return@try null
+            if (minX >= maxX || minY >= maxY) {
+                null
+            } else {
+                var bestScore = Double.MAX_VALUE
+                var bestX = expectedX
+                var bestY = expectedY
 
-            var bestScore = Double.MAX_VALUE
-            var bestX = expectedX
-            var bestY = expectedY
-
-            val exact = scoreAt(screen, template, expectedX, expectedY)
-            if (exact < bestScore) {
-                bestScore = exact
-                bestX = expectedX
-                bestY = expectedY
-            }
-
-            var y = minY
-            while (y <= maxY) {
-                var x = minX
-                while (x <= maxX) {
-                    val score = scoreAt(screen, template, x, y)
-                    if (score < bestScore) {
-                        bestScore = score
-                        bestX = x
-                        bestY = y
-                    }
-                    x += 8
+                val exact = scoreAt(screen, template, expectedX, expectedY)
+                if (exact < bestScore) {
+                    bestScore = exact
+                    bestX = expectedX
+                    bestY = expectedY
                 }
-                y += 8
-            }
 
-            if (bestScore <= maxScore) PointF(bestX.toFloat(), bestY.toFloat()) else null
+                var y = minY
+                while (y <= maxY) {
+                    var x = minX
+                    while (x <= maxX) {
+                        val score = scoreAt(screen, template, x, y)
+                        if (score < bestScore) {
+                            bestScore = score
+                            bestX = x
+                            bestY = y
+                        }
+                        x += 8
+                    }
+                    y += 8
+                }
+
+                if (bestScore <= maxScore) PointF(bestX.toFloat(), bestY.toFloat()) else null
+            }
         } finally {
             screen.recycle()
             template.recycle()
