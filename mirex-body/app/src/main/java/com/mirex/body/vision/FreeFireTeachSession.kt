@@ -25,11 +25,12 @@ class FreeFireTeachSession(
     )
 
     private val steps = listOf(
-        Step("guild_button", "1/5 · Free Fire lobby-তে Guild icon-এ tap করুন", true),
-        Step("members_button", "2/5 · Guild screen-এ Members button/tab-এ tap করুন", true),
-        Step("activity_point", "3/5 · Member list-এ যেকোনো member-এর Activity Point number-এ tap করুন", false),
-        Step("member_row", "4/5 · একই member-এর Name/row-এ tap করুন — profile open হবে", true),
-        Step("uid_field", "5/5 · Profile-এ UID number/UID area-তে tap করুন", false)
+        Step("guild_button", "1/6 · Free Fire lobby-তে Guild icon-এ tap করুন", true),
+        Step("members_button", "2/6 · Guild screen-এ Members button/tab-এ tap করুন", true),
+        Step("activity_point", "3/6 · Member list-এ যেকোনো member-এর THIS WEEK Activity Point number-এ tap করুন", false),
+        Step("member_row", "4/6 · একই member-এর Name/row-এ tap করুন — member select হবে", true),
+        Step("profile_button", "5/6 · ডান পাশে মাঝের Profile/Inspect icon-এ tap করুন", true),
+        Step("uid_field", "6/6 · Profile-এ UID number/UID area-তে tap করুন", false)
     )
 
     private val store = VisualAnchorStore(phone)
