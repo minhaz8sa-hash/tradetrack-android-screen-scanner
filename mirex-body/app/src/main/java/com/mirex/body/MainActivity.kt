@@ -214,6 +214,32 @@ private fun VeyraScreen(
                 }
             }
 
+            Surface(
+                color = Color(0xFF171B21),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Free Fire Visual Skill", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Teach once: Guild → Members → Activity Point → Member/Profile → UID.",
+                            fontSize = 12.sp,
+                            color = Color(0xFFB8C0CA)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { MirexAccessibilityService.instance?.startFreeFireTeach() },
+                        enabled = connected && !running
+                    ) {
+                        Text("Teach Free Fire")
+                    }
+                }
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
