@@ -24,6 +24,7 @@ import com.mirex.body.cloud.CloudSkillStore
 import com.mirex.body.cloud.VeyraCloudClient
 import com.mirex.body.skills.LocalSkillEngine
 import com.mirex.body.language.MultilingualCommandEngine
+import com.mirex.body.vision.FreeFireTeachSession
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -50,6 +51,7 @@ class MirexAccessibilityService : AccessibilityService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var taskJob: Job? = null
     private var stopOverlay: TextView? = null
+    private var freeFireTeachSession: FreeFireTeachSession? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -63,6 +65,8 @@ class MirexAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         taskJob?.cancel()
+        freeFireTeachSession?.cancel()
+        freeFireTeachSession = null
         hideStopOverlay()
         serviceScope.cancel()
         if (instance === this) instance = null
@@ -139,6 +143,21 @@ class MirexAccessibilityService : AccessibilityService() {
         AgentBus.status("Stopped by user")
         AgentBus.add(ChatMessage(ChatRole.System, "Task stopped by user."))
         hideStopOverlay()
+    }
+
+
+    fun startFreeFireTeach() {
+        if (taskJob?.isActive == true) {
+            AgentBus.status("Stop current task before Teach mode")
+            return
+        }
+        freeFireTeachSession?.cancel()
+        freeFireTeachSession = FreeFireTeachSession(this, serviceScope).also { it.start() }
+    }
+
+    fun stopFreeFireTeach() {
+        freeFireTeachSession?.cancel()
+        freeFireTeachSession = null
     }
 
     suspend fun tap(x: Float, y: Float, durationMs: Long = 70L): Boolean {
