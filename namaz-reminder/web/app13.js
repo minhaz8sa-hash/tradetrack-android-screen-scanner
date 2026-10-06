@@ -99,7 +99,9 @@ async function saveProfile160(){
   var p=loadProfile160();p.name=name;p.public=!!document.getElementById('profilePublic160').checked;
   if(profileImageData160)p.imageDataUrl=profileImageData160;
   saveProfileLocal160(p);renderProfile160();
-  if(p.public)await syncProfile160(true);else await syncProfile160(true);
+  useLeaderboardData161(cachedLeaderboard161());
+  if(document.getElementById('page-leaderboard')?.classList.contains('active'))renderLeaderboard160();
+  await syncProfile160(true);
   toast('Profile saved ✓');
 }
 async function syncProfile160(force){
@@ -112,7 +114,11 @@ async function syncProfile160(force){
     if(!r.ok)throw new Error('HTTP '+r.status);
     var j=await r.json();if(!j.ok)throw new Error(j.error||'Sync failed');
     if(status)status.textContent=p.public?'Leaderboard synced':'Profile private • not shown publicly';
-  }catch(e){if(status)status.textContent='Sync unavailable • local profile is safe'}
+  }catch(e){
+    if(status)status.textContent='Saved locally • online sync pending';
+    useLeaderboardData161(cachedLeaderboard161());
+    if(document.getElementById('page-leaderboard')?.classList.contains('active'))renderLeaderboard160();
+  }
 }
 function scheduleProfileSync160(){
   var p=loadProfile160();if(!p.public||!p.name)return;
@@ -131,7 +137,33 @@ function installLeaderboard160(){
     '</div>';
   var more=document.getElementById('page-more');if(more)more.insertAdjacentElement('beforebegin',page);else document.querySelector('main').appendChild(page);
 }
-async function openLeaderboard160(){showPage('leaderboard');await loadLeaderboard160()}
+function localLeaderboardUser161(){
+  var p=loadProfile160();if(!p.name||!p.public)return null;
+  return {id:noUserId160(),name:p.name,imageUrl:p.imageDataUrl||'',stats:stats160(),updatedAt:Date.now()};
+}
+function mergeLeaderboardUsers161(server){
+  var local=localLeaderboardUser161(),out=[],seen={};
+  (server||[]).forEach(function(u){if(!u||!u.id||seen[u.id])return;seen[u.id]=1;out.push(u)});
+  if(local){
+    var idx=out.findIndex(function(u){return u.id===local.id});
+    if(idx>=0)out[idx]=local;else out.unshift(local);
+  }
+  return out;
+}
+function cachedLeaderboard161(){
+  try{return JSON.parse(localStorage.getItem('no_leaderboard_cache_161')||'{}')||{}}catch(e){return{}}
+}
+function useLeaderboardData161(data){
+  leaderboardData160={
+    perfect:mergeLeaderboardUsers161(data&&data.perfect||[]),
+    qaza:mergeLeaderboardUsers161(data&&data.qaza||[])
+  };
+}
+async function openLeaderboard160(){
+  showPage('leaderboard');
+  var cached=cachedLeaderboard161();useLeaderboardData161(cached);renderLeaderboard160();
+  await loadLeaderboard160();
+}
 function setLeaderboardMode160(mode){
   leaderboardMode160=mode==='qaza'?'qaza':'perfect';
   document.getElementById('lbPerfectTab160')?.classList.toggle('active',leaderboardMode160==='perfect');
@@ -139,11 +171,20 @@ function setLeaderboardMode160(mode){
   renderLeaderboard160();
 }
 async function loadLeaderboard160(){
-  var list=document.getElementById('leaderboardList160');if(list)list.innerHTML='<div class="lb-empty160">Loading leaderboard…</div>';
+  var list=document.getElementById('leaderboardList160');
+  var hasLocal=(leaderboardData160[leaderboardMode160]||[]).length>0;
+  if(list&&!hasLocal)list.innerHTML='<div class="lb-empty160">Loading leaderboard…</div>';
   try{
     var r=await fetch(NO_API_160+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);
-    var j=await r.json();leaderboardData160={perfect:j.perfect||[],qaza:j.qaza||[]};renderLeaderboard160();
-  }catch(e){if(list)list.innerHTML='<div class="lb-empty160">Leaderboard server unavailable. আবার চেষ্টা করুন।</div>'}
+    var j=await r.json();
+    var data={perfect:j.perfect||[],qaza:j.qaza||[]};
+    localStorage.setItem('no_leaderboard_cache_161',JSON.stringify(data));
+    useLeaderboardData161(data);renderLeaderboard160();
+  }catch(e){
+    useLeaderboardData161(cachedLeaderboard161());renderLeaderboard160();
+    var st=document.getElementById('profileSync160');
+    if(st&&loadProfile160().public)st.textContent='Saved locally • online sync pending';
+  }
 }
 function renderLeaderboard160(){
   var list=document.getElementById('leaderboardList160');if(!list)return;
@@ -173,6 +214,7 @@ function showLeaderboardUser160(u){
 
 (function init160(){
   moveLocationMore160();installProfile160();installLeaderboard160();
+  useLeaderboardData161(cachedLeaderboard161());
   var oldShow160=window.showPage;window.showPage=function(name){
     oldShow160(name);
     if(name==='leaderboard')document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('active',b.dataset.page==='more')});
