@@ -2,12 +2,16 @@ package com.mirex.body.skills
 
 import android.graphics.Rect
 import com.mirex.body.accessibility.MirexAccessibilityService
+import com.mirex.body.vision.VisualAnchorMatcher
+import com.mirex.body.vision.VisualAnchorStore
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
 class FreeFireGuildCollector(
     private val phone: MirexAccessibilityService
 ) {
+    private val anchorStore = VisualAnchorStore(phone)
+    private val anchorMatcher = VisualAnchorMatcher(phone, anchorStore)
     data class Member(
         val name: String,
         val activity: Int,
@@ -35,15 +39,27 @@ class FreeFireGuildCollector(
         delay(5000)
         dismissSimplePopups()
 
-        if (!clickAny("Guild", "GUILD", "Guilds")) {
-            return Result(false, "Free Fire খুলেছে, কিন্তু Guild option OCR/text দিয়ে পাওয়া যায়নি।")
+        if (!clickAny("Guild", "GUILD", "Guilds") && !anchorMatcher.tap("guild_button")) {
+            val teachHint = if (anchorStore.has("guild_button")) {
+                "Learned Guild anchor match হয়নি। Teach Free Fire আবার চালান।"
+            } else {
+                "Guild icon text নয়। আগে Veyra-তে Teach Free Fire চালিয়ে Guild icon শেখান।"
+            }
+            return Result(false, teachHint)
         }
 
         delay(1800)
         dismissSimplePopups()
 
-        if (!clickAny("Members", "MEMBERS", "Member", "Members List", "Member List")) {
-            return Result(false, "Guild খুলেছে, কিন্তু Members option পাওয়া যায়নি।")
+        if (!clickAny("Members", "MEMBERS", "Member", "Members List", "Member List") &&
+            !anchorMatcher.tap("members_button")
+        ) {
+            val teachHint = if (anchorStore.has("members_button")) {
+                "Learned Members anchor match হয়নি। Teach Free Fire আবার চালান।"
+            } else {
+                "Members button পাওয়া যায়নি। আগে Teach Free Fire দিয়ে Members শেখান।"
+            }
+            return Result(false, teachHint)
         }
 
         delay(1500)
@@ -152,6 +168,20 @@ class FreeFireGuildCollector(
             }
         }
 
+        val learned = anchorStore.load("uid_field")
+        if (learned != null) {
+            val expectedX = learned.normX * learned.screenWidth
+            val expectedY = learned.normY * learned.screenHeight
+            val nearby = items
+                .filter { uidRegex.containsMatchIn(it.text) }
+                .sortedBy { item ->
+                    abs(item.bounds.centerX() - expectedX) + abs(item.bounds.centerY() - expectedY)
+                }
+            for (item in nearby) {
+                uidRegex.find(item.text)?.value?.let { return it }
+            }
+        }
+
         for (item in items) {
             uidRegex.find(item.text)?.value?.let { return it }
         }
@@ -176,7 +206,10 @@ class FreeFireGuildCollector(
 
         if (numeric.isEmpty()) return emptyList()
 
-        val activityColumnX = numeric
+        val learnedActivity = anchorStore.load("activity_point")
+        val activityColumnX = learnedActivity?.let {
+            it.normX * it.screenWidth
+        } ?: numeric
             .groupBy { (item, _) -> item.bounds.centerX() / 80 }
             .maxByOrNull { it.value.size }
             ?.value
@@ -184,8 +217,9 @@ class FreeFireGuildCollector(
             ?.average()
             ?: return emptyList()
 
+        val tolerance = if (learnedActivity != null) 150.0 else 100.0
         val activityItems = numeric.filter { (item, _) ->
-            abs(item.bounds.centerX() - activityColumnX) <= 100
+            abs(item.bounds.centerX() - activityColumnX) <= tolerance
         }
 
         val ignored = listOf(
@@ -207,7 +241,13 @@ class FreeFireGuildCollector(
                 hasNameChar && sameRow && leftOfActivity && sensible
             }
 
-            val nameItem = names.maxByOrNull { it.bounds.left } ?: continue
+            val learnedMember = anchorStore.load("member_row")
+            val nameItem = if (learnedMember != null) {
+                val expectedX = learnedMember.normX * learnedMember.screenWidth
+                names.minByOrNull { item -> abs(item.bounds.centerX() - expectedX) }
+            } else {
+                names.maxByOrNull { it.bounds.left }
+            } ?: continue
             val name = nameItem.text.trim()
             if (ignored.any { key -> name.contains(key, true) }) continue
 
