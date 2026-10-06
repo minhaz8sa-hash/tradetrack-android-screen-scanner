@@ -192,5 +192,5 @@
 
   ensurePortal156();
   syncQaza156(true);
-  if(!raf)raf=requestAnimationFrame(animate156);
+  /* v1.6.1: CSS ring tracks in app14 handle orbit animation */
 })();
