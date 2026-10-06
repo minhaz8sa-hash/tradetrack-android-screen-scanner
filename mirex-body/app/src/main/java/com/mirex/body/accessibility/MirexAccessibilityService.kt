@@ -264,6 +264,85 @@ class MirexAccessibilityService : AccessibilityService() {
         return swipe(x, y1, x, y2, 420L)
     }
 
+
+    suspend fun gameViewport(): Rect? {
+        val frame = screenshot() ?: return null
+        val bytes = runCatching {
+            android.util.Base64.decode(frame.base64Jpeg, android.util.Base64.NO_WRAP)
+        }.getOrNull() ?: return null
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+
+        return try {
+            val stepX = (bitmap.width / 48).coerceAtLeast(1)
+            val rowScore = DoubleArray(bitmap.height)
+            for (y in 0 until bitmap.height) {
+                var total = 0.0
+                var count = 0
+                var x = 0
+                while (x < bitmap.width) {
+                    val color = bitmap.getPixel(x, y)
+                    val r = (color shr 16) and 0xff
+                    val g = (color shr 8) and 0xff
+                    val b = color and 0xff
+                    total += (r + g + b) / 3.0
+                    count++
+                    x += stepX
+                }
+                rowScore[y] = if (count > 0) total / count else 0.0
+            }
+
+            val threshold = 7.0
+            var bestStart = -1
+            var bestEnd = -1
+            var currentStart = -1
+
+            for (y in rowScore.indices) {
+                val active = rowScore[y] >= threshold
+                if (active && currentStart < 0) currentStart = y
+
+                val closing = (!active || y == rowScore.lastIndex) && currentStart >= 0
+                if (closing) {
+                    val end = if (active && y == rowScore.lastIndex) y else y - 1
+                    if (end - currentStart > bestEnd - bestStart) {
+                        bestStart = currentStart
+                        bestEnd = end
+                    }
+                    currentStart = -1
+                }
+            }
+
+            if (bestStart < 0 || bestEnd <= bestStart || bestEnd - bestStart < bitmap.height * 0.12) {
+                Rect(0, 0, bitmap.width, bitmap.height)
+            } else {
+                Rect(0, bestStart, bitmap.width, bestEnd + 1)
+            }
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    suspend fun tapGameRelative(nx: Float, ny: Float): Boolean {
+        val viewport = gameViewport() ?: return false
+        val x = viewport.left + viewport.width() * nx.coerceIn(0f, 1f)
+        val y = viewport.top + viewport.height() * ny.coerceIn(0f, 1f)
+        return tap(x, y)
+    }
+
+    suspend fun swipeGameRelative(
+        nx1: Float,
+        ny1: Float,
+        nx2: Float,
+        ny2: Float,
+        durationMs: Long = 420L
+    ): Boolean {
+        val viewport = gameViewport() ?: return false
+        val x1 = viewport.left + viewport.width() * nx1.coerceIn(0f, 1f)
+        val y1 = viewport.top + viewport.height() * ny1.coerceIn(0f, 1f)
+        val x2 = viewport.left + viewport.width() * nx2.coerceIn(0f, 1f)
+        val y2 = viewport.top + viewport.height() * ny2.coerceIn(0f, 1f)
+        return swipe(x1, y1, x2, y2, durationMs)
+    }
+
     private suspend fun findTextBoundsByOcr(query: String): Rect? {
         val q = query.trim()
         if (q.isBlank()) return null
