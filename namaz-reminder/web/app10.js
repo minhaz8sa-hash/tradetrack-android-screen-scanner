@@ -15,7 +15,7 @@ function coreDistanceMetersV15(a,b){
 function enforceCoreAlarmSettingsV15(){
   settings=settings||{};
   settings.preReminder=10;
-  settings.endReminder=false;
+  settings.endReminder=true;
   if(typeof settings.vibration==='undefined')settings.vibration=true;
   localStorage.setItem('no_settings',JSON.stringify(settings));
   var pre=document.getElementById('preReminder');
@@ -30,7 +30,7 @@ function enforceCoreAlarmSettingsV15(){
   }
   var end=document.getElementById('endReminderEnabled');
   if(end){
-    end.checked=false;
+    end.checked=true;
     var row=end.closest('label');if(row)row.style.display='none';
   }
 }
