@@ -3,6 +3,7 @@ var coreLocationWatchIdV15=null;
 var coreLastAppliedLocationV15=0;
 var coreLastReverseGeocodeV15=0;
 var coreLastPositionV15=null;
+var coreLastGpsAccuracyV17=null;
 
 function coreDistanceMetersV15(a,b){
   if(!a||!b)return Infinity;
@@ -115,6 +116,7 @@ async function reverseGeocodeCoreV15(next,force){
 
 function applyCoreLocationV15(next,accuracy){
   var now=Date.now();
+  if(Number.isFinite(Number(accuracy)))coreLastGpsAccuracyV17=Number(accuracy);
   var before=coords?{lat:coords.lat,lon:coords.lon}:null;
   var moved=coreDistanceMetersV15(before,next);
   coords=next;
