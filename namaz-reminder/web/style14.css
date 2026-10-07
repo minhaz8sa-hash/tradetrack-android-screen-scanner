@@ -1,0 +1,47 @@
+/* Namaz Orbit v1.7.0 — Accuracy Center, Qibla Calibration, Dhikr, Widget */
+.accuracy170{margin-bottom:14px}
+.acc-head170{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.acc-head170 h3{margin:0}.acc-head170 small{display:block;color:var(--muted);font-size:9px;line-height:1.5;margin-top:3px}
+.acc-badge170{padding:6px 9px;border-radius:999px;border:1px solid rgba(142,240,207,.16);background:rgba(142,240,207,.055);font-size:9px;color:var(--accent);white-space:nowrap}
+.acc-grid170{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.acc-item170{padding:11px;border-radius:15px;border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.025)}
+.acc-item170 b{display:block;font-size:13px;color:#eafff8}
+.acc-item170 span{display:block;font-size:8px;color:var(--muted);margin-top:3px;line-height:1.45}
+.acc-actions170{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+
+.qcal170{margin-bottom:14px}
+.qcal-live170{display:grid;grid-template-columns:86px 1fr;gap:14px;align-items:center}
+.qcal-dial170{width:86px;height:86px;border-radius:50%;border:1px solid rgba(142,240,207,.20);position:relative;display:grid;place-items:center;background:radial-gradient(circle,rgba(142,240,207,.06),rgba(0,0,0,.12))}
+.qcal-arrow170{font-size:30px;color:var(--accent);filter:drop-shadow(0 0 8px rgba(142,240,207,.55));transition:transform .16s linear}
+.qcal-kaaba170{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:15px;height:15px;border:1px solid #f2d58a;border-radius:3px;background:#0b0d0c}
+.qcal-kaaba170:after{content:"";position:absolute;left:2px;right:2px;top:5px;height:1px;background:#f2d58a}
+.qcal-copy170 b{font-size:14px}.qcal-copy170 .turn{font-size:12px;color:var(--accent);margin-top:4px}.qcal-copy170 small{display:block;color:var(--muted);font-size:9px;line-height:1.5;margin-top:4px}
+.qcal-note170{margin-top:10px;padding:10px 11px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);font-size:9px;color:var(--muted);line-height:1.55}
+
+.widget-card170{margin-bottom:14px}
+.widget-preview170{padding:13px;border-radius:18px;background:linear-gradient(145deg,rgba(23,59,49,.88),rgba(7,29,24,.96));border:1px solid rgba(142,240,207,.13);margin-top:10px}
+.widget-preview170 .wp-eyebrow{font-size:8px;color:var(--accent);font-weight:700;letter-spacing:.8px}
+.widget-preview170 .wp-name{font-size:16px;font-weight:800;margin-top:4px}
+.widget-preview170 .wp-time{font-size:20px;color:var(--accent);font-weight:800;margin-top:2px}
+.widget-preview170 .wp-foot{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:9px;color:var(--muted)}
+
+.dhikr-launch170{margin-top:10px}
+.dhikr-sheet170{position:fixed;inset:0;z-index:7000;background:rgba(0,8,6,.72);display:none;align-items:flex-end;justify-content:center;padding:18px}
+.dhikr-sheet170.open{display:flex}
+.dhikr-panel170{width:min(100%,520px);border-radius:26px;padding:18px;background:linear-gradient(155deg,rgba(21,62,51,.98),rgba(5,25,20,.995));border:1px solid rgba(142,240,207,.18);box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.dhikr-head170{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.dhikr-head170 h3{margin:0}.dhikr-head170 small{display:block;color:var(--muted);font-size:9px;line-height:1.5;margin-top:4px}
+.dhikr-close170{border:0;background:rgba(255,255,255,.06);color:var(--text);width:34px;height:34px;border-radius:12px;font-size:18px}
+.dhikr-list170{display:grid;gap:9px;margin-top:13px}
+.dhikr-row170{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px;border-radius:17px;border:1px solid rgba(142,240,207,.10);background:rgba(255,255,255,.025)}
+.dhikr-row170 b{display:block}.dhikr-row170 small{display:block;color:var(--muted);font-size:9px;margin-top:3px}
+.dhikr-count170{min-width:72px;padding:9px 12px;border-radius:14px;border:1px solid rgba(142,240,207,.22);background:rgba(142,240,207,.075);color:var(--accent);font-size:15px;font-weight:800}
+.dhikr-count170.done{background:rgba(142,240,207,.16);color:#effff9}
+.dhikr-foot170{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.dhikr-progress170{height:5px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:12px}
+.dhikr-progress170 span{display:block;height:100%;width:0;background:var(--accent);transition:width .18s ease}
+
+@media(max-width:390px){
+  .acc-grid170{grid-template-columns:1fr 1fr}
+  .qcal-live170{grid-template-columns:76px 1fr}.qcal-dial170{width:76px;height:76px}
+}
