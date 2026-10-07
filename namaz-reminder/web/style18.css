@@ -1,0 +1,71 @@
+/* Namaz Orbit v1.9.0 — Dhikr Library + system bubble + Mosque Set + Quran Progress */
+.dhikr-settings182{margin-bottom:14px}
+.dhikr-settings182 h3{margin:0}
+.dhikr-library182{display:grid;gap:8px;margin-top:11px}
+.dhikr-lib-row182{
+  display:grid;grid-template-columns:26px 1fr 78px;gap:8px;align-items:center;
+  padding:10px;border-radius:14px;border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.025)
+}
+.dhikr-lib-row182 input[type=checkbox]{width:18px;height:18px;accent-color:#8ef0cf}
+.dhikr-lib-main182 b{display:block;font-size:10px;color:#effff9}
+.dhikr-lib-main182 small{display:block;font-size:8px;color:var(--muted);margin-top:2px}
+.dhikr-target182{
+  width:74px;padding:8px;border-radius:10px;border:1px solid rgba(142,240,207,.12);
+  background:rgba(3,18,14,.6);color:var(--text);text-align:center
+}
+.dhikr-custom182{display:grid;grid-template-columns:1fr 76px auto;gap:7px;margin-top:10px}
+.dhikr-custom182 input{
+  min-width:0;padding:9px;border-radius:11px;border:1px solid rgba(142,240,207,.12);
+  background:rgba(3,18,14,.6);color:var(--text)
+}
+.dhikr-actions182{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.dhikr-overlay-status182{margin-top:8px;font-size:8px;color:var(--muted);line-height:1.45}
+.dhikr-overlay-status182.ready{color:var(--accent)}
+
+.nearby-buttons182{display:flex;gap:6px;align-items:center}
+.nearby-set182,.nearby-fav181{
+  padding:7px 8px;border-radius:10px;font-size:8px
+}
+.nearby-set182{
+  border:1px solid rgba(142,240,207,.18);
+  background:rgba(142,240,207,.07);color:var(--accent)
+}
+.nearby-set182.selected{
+  background:rgba(142,240,207,.16);color:#effff9
+}
+.nearby-selected182{
+  margin-top:8px;padding:8px 9px;border-radius:11px;
+  border:1px solid rgba(142,240,207,.10);
+  background:rgba(142,240,207,.035);font-size:8px;color:var(--muted)
+}
+
+.quran-progress182{margin-bottom:12px}
+.quran-progress-head182{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.quran-progress-head182 h3{margin:0}
+.quran-progress-head182 small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
+.quran-goal182{display:grid;grid-template-columns:1fr 92px;gap:8px;align-items:center;margin-top:10px}
+.quran-goal182 input{
+  width:92px;padding:8px;border-radius:10px;border:1px solid rgba(142,240,207,.12);
+  background:rgba(3,18,14,.6);color:var(--text);text-align:center
+}
+.quran-progressbar182{height:7px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:10px}
+.quran-progressbar182 span{display:block;height:100%;width:0;background:linear-gradient(90deg,#8ef0cf,#4b9c82);transition:width .18s ease}
+.quran-stats182{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+.quran-stat182{padding:9px 5px;border-radius:12px;text-align:center;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
+.quran-stat182 b{display:block;color:var(--accent);font-size:14px}.quran-stat182 span{display:block;color:var(--muted);font-size:7px;margin-top:2px}
+.quran-actions182{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.ayah-tools182{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.ayah-tool182{
+  padding:6px 8px;border-radius:9px;border:1px solid rgba(142,240,207,.11);
+  background:rgba(142,240,207,.035);color:var(--muted);font-size:8px
+}
+.ayah-tool182.active{color:var(--accent);background:rgba(142,240,207,.10);border-color:rgba(142,240,207,.25)}
+#quranContinue182[disabled]{opacity:.45}
+
+@media(max-width:390px){
+  .dhikr-lib-row182{grid-template-columns:24px 1fr 70px}
+  .dhikr-target182{width:66px}
+  .dhikr-custom182{grid-template-columns:1fr 68px}
+  .dhikr-custom182 button{grid-column:1/-1}
+}
