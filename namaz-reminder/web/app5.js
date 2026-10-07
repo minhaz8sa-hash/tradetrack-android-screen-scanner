@@ -16,7 +16,7 @@ const UPGRADE_CSS='/* v1.1 prayer UX */\n.switch-row{display:flex;align-items:ce
 function installUpgradeUI(){
   if(!document.getElementById('namazOrbitV110Style')){const st=document.createElement('style');st.id='namazOrbitV110Style';st.textContent=UPGRADE_CSS;document.head.appendChild(st)}
   const core=document.querySelector('.orbit-core');if(core&&!document.getElementById('qiblaCompass')){core.id='qiblaCompass';core.innerHTML=`<div class="qibla-card"><small class="qibla-label">QIBLA</small><div class="qibla-dial"><div class="qibla-arrow" id="qiblaArrow">➤</div><div class="kaaba">▣</div></div><strong id="qiblaBearing">—°</strong><small id="qiblaStatus">Direction loading…</small><div class="mini-complete"><span id="completeCount">0</span>/5 • <span id="todayPercent">0% complete</span></div></div>`}
-  const alarm=document.getElementById('alarmSound');if(alarm&&!document.getElementById('vibrationEnabled')){alarm.closest('label').insertAdjacentHTML('afterend',`<label class="switch-row"><span><b>Vibration</b><small>Prayer, Qaza and end-time reminders</small></span><input id="vibrationEnabled" type="checkbox" checked></label><label class="switch-row"><span><b>End-time reminders</b><small>20 and 10 minutes before a prayer window ends</small></span><input id="endReminderEnabled" type="checkbox" checked></label>`)}
+  const alarm=document.getElementById('alarmSound');if(alarm&&!document.getElementById('vibrationEnabled')){alarm.closest('label').insertAdjacentHTML('afterend',`<label class="switch-row"><span><b>Vibration</b><small>Prayer, Qaza and end-time reminders</small></span><input id="vibrationEnabled" type="checkbox" checked></label><label class="switch-row"><span><b>End-time reminders</b><small>20 minutes before a prayer window ends</small></span><input id="endReminderEnabled" type="checkbox" checked></label>`)}
 }
 
 settings=Object.assign({vibration:true,endReminder:true},settings||{});
@@ -115,7 +115,7 @@ function scheduleAlarms(){
       if(pre>0) scheduleNative(`NO_${k}_${p.key}_pre`,`${p.bn} ${pre} মিনিট পরে`,`আর ${pre} মিনিট পরে ${p.bn} শুরু হবে।`,at-pre*60000,sound,vibrate);
       if(qIndex<queue.length){const q=queue[qIndex++];scheduleNative(`NO_QAZA_${k}_${p.key}`,`Qaza reminder • ${p.bn} time`,`Serial #${qIndex}: সবচেয়ে পুরনো Qaza — ${qazaItemLabel(q)}। এই নামাজের সাথে ১টি Qaza আদায়ের reminder।`,at+15000,sound,vibrate)}
     }
-    if(settings.endReminder!==false){const end=endForPrayer(times,p.key,nextTimes).getTime();for(const mins of [20,10])scheduleNative(`NO_${k}_${p.key}_end_${mins}`,`${p.bn} সময় শেষ হতে ${mins} মিনিট`,`এই নামাজের সময় শেষ হতে প্রায় ${mins} মিনিট বাকি। Complete হয়ে থাকলে app-এ mark করুন।`,end-mins*60000,sound,vibrate)}
+    if(settings.endReminder!==false){const end=endForPrayer(times,p.key,nextTimes).getTime();for(const mins of [20])scheduleNative(`NO_${k}_${p.key}_end_${mins}`,`${p.bn} সময় শেষ হতে ${mins} মিনিট`,`এই নামাজের সময় শেষ হতে প্রায় ${mins} মিনিট বাকি। Complete হয়ে থাকলে app-এ mark করুন।`,end-mins*60000,sound,vibrate)}
   }
 }
 function cancelPrayerReminderIds(k,p){
