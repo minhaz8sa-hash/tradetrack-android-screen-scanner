@@ -159,7 +159,7 @@ function scheduleAlarmsV13(force){
       if(at>Date.now()+1000){try{if(window.AndroidBridge.scheduleAlarmV2)window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_start',p.bn+' • '+p.name,'নামাজের সময় শুরু হয়েছে।',at,sound,vibrate)}catch(e){}
         if(pre>0&&at-pre*60000>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_pre',p.bn+' '+pre+' মিনিট পরে','আর '+pre+' মিনিট পরে '+p.bn+' শুরু হবে।',at-pre*60000,sound,vibrate)}catch(e){}}
       }
-      if(settings.endReminder!==false){[20,10].forEach(function(mins){var when=endAt-mins*60000;if(when>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_end_'+mins,p.bn+' সময় শেষ হতে '+mins+' মিনিট','সময় শেষ হওয়ার আগে নামাজ সম্পন্ন করুন।',when,sound,vibrate)}catch(e){}}})}
+      if(settings.endReminder!==false){var mins=20,when=endAt-mins*60000;if(when>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_end_20','⚠ '+p.bn+' • সময় শেষ হতে ২০ মিনিট','নামাজের সময় শেষ হয়ে যাচ্ছে। নামাজ complete করে থাকলে Complete দিন।',when,sound,vibrate)}catch(e){}}}
     });
   }
 }
@@ -261,7 +261,7 @@ function installSettingsExtrasV13(){
   var qplan=document.getElementById('qazaSuggestion');if(qplan)qplan.remove();
   if(typeof renderQazaSuggestion==='function')renderQazaSuggestion=function(){var x=document.getElementById('qazaSuggestion');if(x)x.remove()};
   var alarm=document.getElementById('alarmSound');
-  if(alarm&&!document.getElementById('vibrationEnabled'))alarm.closest('label').insertAdjacentHTML('afterend','<label class="switch-row"><span><b>Vibration</b><small>Prayer and end-time reminders</small></span><input id="vibrationEnabled" type="checkbox" checked></label><label class="switch-row"><span><b>End-time reminders</b><small>20 and 10 minutes before end</small></span><input id="endReminderEnabled" type="checkbox" checked></label>');
+  if(alarm&&!document.getElementById('vibrationEnabled'))alarm.closest('label').insertAdjacentHTML('afterend','<label class="switch-row"><span><b>Vibration</b><small>Prayer and end-time reminders</small></span><input id="vibrationEnabled" type="checkbox" checked></label><label class="switch-row"><span><b>End-time reminders</b><small>20 minutes before prayer end</small></span><input id="endReminderEnabled" type="checkbox" checked></label>');
   var controls=document.querySelector('#page-more .controls');if(controls&&!document.getElementById('tzStatusV13')){var tz=document.createElement('div');tz.id='tzStatusV13';tz.className='tz-chip';tz.innerHTML='<span>Auto time zone</span><b>'+(isBangladeshCoords(coords)?'Asia/Dhaka • UTC+6':'Device / location')+'</b>';controls.insertBefore(tz,controls.firstChild)}
   if(!document.getElementById('testAlarmPanelV13')){
     var panel=document.createElement('div');panel.id='testAlarmPanelV13';panel.className='panel glass test-panel';panel.innerHTML='<h3>Alarm Test</h3><div class="test-row"><div class="test-icon">'+v13Svg('bell')+'</div><div style="flex:1"><b>Test alarm + vibration</b><div class="meta">৩ সেকেন্ড পরে test alert আসবে</div></div><button class="btn" onclick="testAlarmV13()">Test</button></div>';
@@ -283,7 +283,7 @@ function refreshAllV13(){renderDatesV13();renderTodayV13();requestAnimationFrame
 refreshAll=refreshAllV13;
 
 (function initV13Core(){
-  settings.preReminder=10;settings.endReminder=false;localStorage.setItem('no_settings',JSON.stringify(settings));
+  settings.preReminder=10;settings.endReminder=true;localStorage.setItem('no_settings',JSON.stringify(settings));
   installV13Style();installBrandAndLocationV13();installNavbarV13();installQiblaV13();installSettingsExtrasV13();removeHomeEventV13();
   renderDatesV13();renderTodayV13();updateQiblaV13();
   var v13Tick=0;setInterval(function(){if(document.hidden)return;updateCountdownV13();if(++v13Tick%60===0&&autoUpdateQazaV13(true))renderTodayV13()},1000);
