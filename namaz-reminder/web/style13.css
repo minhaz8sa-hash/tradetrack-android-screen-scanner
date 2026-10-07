@@ -1,0 +1,41 @@
+/* Namaz Orbit v1.6.2 — calendar end time + Qibla marker */
+.calendar-time-range162{
+  display:block;
+  margin-top:2px;
+  font-size:10px!important;
+  color:var(--muted)!important;
+  line-height:1.45;
+}
+.calendar-status162{
+  display:block;
+  margin-top:4px;
+  font-size:10px!important;
+}
+.calendar-status162.qaza{color:var(--danger)!important}
+.calendar-status162.complete{color:var(--accent)!important}
+
+.qibla-v13 .dial:before{content:none!important}
+.qibla-marker162{
+  position:absolute;
+  top:2px;
+  left:50%;
+  transform:translateX(-50%);
+  width:16px;height:16px;
+  display:grid;place-items:center;
+  z-index:6;
+  pointer-events:none;
+}
+.qibla-marker162 svg{
+  width:16px;height:16px;
+  overflow:visible;
+}
+.qibla-marker162 .qk-body{
+  fill:#0a0d0c;
+  stroke:#f2d58a;
+  stroke-width:1.4;
+}
+.qibla-marker162 .qk-band{
+  stroke:#f2d58a;
+  stroke-width:1.4;
+  stroke-linecap:round;
+}
