@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v1.8.1 JavaScript syntax
+      - name: Check v1.9.0 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -43,6 +43,7 @@ jobs:
           node --check web/app17.js
           node --check web/app18.js
           node --check web/app19.js
+          node --check web/app20.js
           node --check web/api/leaderboard.js
 
       - name: Set up JDK 17
@@ -72,13 +73,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.8.1.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.9.0.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.8.1
-          path: namaz-reminder/Namaz-Orbit-v1.8.1.apk
+          name: Namaz-Orbit-v1.9.0
+          path: namaz-reminder/Namaz-Orbit-v1.9.0.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -87,7 +88,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.8.1 --yes || true
-          git tag -d v1.8.1 2>/dev/null || true
-          git push origin :refs/tags/v1.8.1 2>/dev/null || true
-          gh release create v1.8.1 Namaz-Orbit-v1.8.1.apk --target main --title "Namaz Orbit v1.8.1" --notes "v1.8.1: Dhikr is now a draggable floating circular counter only (no full sheet), tap cycles 33 SubhanAllah → 33 Alhamdulillah → 34 Allahu Akbar and auto-hides on completion. P3 next phase adds nearby mosque discovery, favorites, Eid prayer schedule fields, and local mosque announcements while retaining manual Jamaat/Jummah times."
+          gh release delete v1.9.0 --yes || true
+          git tag -d v1.9.0 2>/dev/null || true
+          git push origin :refs/tags/v1.9.0 2>/dev/null || true
+          gh release create v1.9.0 Namaz-Orbit-v1.9.0.apk --target main --title "Namaz Orbit v1.9.0" --notes "v1.9.0: restores full Dhikr settings/library with reset, selectable built-in Dhikr, custom Dhikr and target counts; adds Android system-level floating Dhikr circle over Home/other apps; fixes Nearby Mosque location/set flow with explicit Set Mosque action; starts Quran Progress phase with daily ayah goal, Last Read, bookmarks and Continue."
