@@ -10,8 +10,8 @@ android {
         applicationId = "com.mirex.namazorbit"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "1.8.0"
+        versionCode = 21
+        versionName = "1.8.1"
     }
 
     sourceSets {
