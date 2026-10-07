@@ -1,0 +1,134 @@
+/* Namaz Orbit v1.8.1 — Floating Dhikr + Mosque discovery */
+
+/* Old full Dhikr sheet is no longer used in this phase. */
+#dhikrSheet170{display:none!important}
+
+/* Draggable floating Dhikr counter */
+#dhikrFloat181{
+  position:fixed;
+  width:86px;
+  height:86px;
+  left:calc(100vw - 104px);
+  top:58%;
+  z-index:7600;
+  display:none;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+#dhikrFloat181.show{display:block}
+.dhikr-float-circle181{
+  width:86px;
+  height:86px;
+  border-radius:50%;
+  border:2px solid rgba(142,240,207,.48);
+  background:
+    radial-gradient(circle at 35% 28%,rgba(142,240,207,.20),rgba(8,37,30,.97) 56%,rgba(4,21,17,.995));
+  box-shadow:
+    0 0 0 6px rgba(142,240,207,.035),
+    0 10px 30px rgba(0,0,0,.38),
+    0 0 22px rgba(142,240,207,.14);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  color:#effff9;
+  transition:transform .08s ease,box-shadow .18s ease,border-color .18s ease;
+}
+.dhikr-float-circle181.tap{transform:scale(.94)}
+.dhikr-float-circle181.done{
+  border-color:#8ef0cf;
+  box-shadow:0 0 34px rgba(142,240,207,.32),0 10px 30px rgba(0,0,0,.38);
+}
+.dhikr-float-count181{
+  font-size:25px;
+  line-height:1;
+  font-weight:850;
+  color:var(--accent);
+  font-variant-numeric:tabular-nums;
+}
+.dhikr-float-stage181{
+  margin-top:3px;
+  max-width:68px;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  text-align:center;
+  font-size:7px;
+  color:var(--muted);
+}
+.dhikr-float-target181{
+  margin-top:1px;
+  font-size:7px;
+  color:#dcebe6;
+}
+.dhikr-float-drag181{
+  position:absolute;
+  width:22px;
+  height:7px;
+  left:50%;
+  top:-11px;
+  transform:translateX(-50%);
+  border-radius:999px;
+  background:rgba(142,240,207,.22);
+  box-shadow:0 0 8px rgba(142,240,207,.08);
+}
+
+/* P3 next: nearby mosque/favorite/schedules/announcement */
+.mosque-discovery181{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
+.mosque-discovery181 h4{margin:0 0 4px;font-size:12px;color:#effff9}
+.mosque-discovery181>.meta{font-size:8px;line-height:1.45}
+.nearby-actions181{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.nearby-list181{display:grid;gap:7px;margin-top:9px}
+.nearby-item181{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:8px;
+  align-items:center;
+  padding:10px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.025);
+}
+.nearby-main181 b{display:block;font-size:10px;color:#effff9}
+.nearby-main181 small{display:block;font-size:8px;color:var(--muted);margin-top:2px;line-height:1.4}
+.nearby-fav181{
+  min-width:72px;
+  padding:7px 8px;
+  border-radius:10px;
+  border:1px solid rgba(242,213,138,.18);
+  background:rgba(242,213,138,.055);
+  color:#f2d58a;
+  font-size:8px;
+}
+.nearby-fav181.active{background:rgba(242,213,138,.15)}
+.mosque-extra181{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mosque-extra181 .mosque-time180{margin:0}
+.mosque-ann181{margin-top:9px}
+.mosque-ann181 textarea{
+  width:100%;
+  min-height:72px;
+  resize:vertical;
+  padding:10px;
+  border-radius:13px;
+  border:1px solid rgba(142,240,207,.13);
+  background:rgba(3,18,14,.58);
+  color:var(--text);
+  font:inherit;
+}
+.mosque-home-ann181{
+  margin-top:6px;
+  padding:5px 7px;
+  border-radius:9px;
+  border:1px solid rgba(142,240,207,.10);
+  background:rgba(142,240,207,.04);
+  color:var(--muted);
+  font-size:8px;
+  line-height:1.4;
+}
+@media(max-width:390px){
+  #dhikrFloat181,.dhikr-float-circle181{width:80px;height:80px}
+  .dhikr-float-count181{font-size:23px}
+  .mosque-extra181,.nearby-actions181{grid-template-columns:1fr}
+}
