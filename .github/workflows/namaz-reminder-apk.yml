@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v1.6.1 JavaScript syntax
+      - name: Check v1.6.2 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -38,6 +38,7 @@ jobs:
           node --check web/app12.js
           node --check web/app13.js
           node --check web/app14.js
+          node --check web/app15.js
           node --check web/api/leaderboard.js
 
       - name: Set up JDK 17
@@ -67,13 +68,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.6.1.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.6.2.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.6.1
-          path: namaz-reminder/Namaz-Orbit-v1.6.1.apk
+          name: Namaz-Orbit-v1.6.2
+          path: namaz-reminder/Namaz-Orbit-v1.6.2.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -82,7 +83,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.6.1 --yes || true
-          git tag -d v1.6.1 2>/dev/null || true
-          git push origin :refs/tags/v1.6.1 2>/dev/null || true
-          gh release create v1.6.1 Namaz-Orbit-v1.6.1.apk --target main --title "Namaz Orbit v1.6.1" --notes "v1.6.1: prayer and Qaza icons are locked to exact rotating ring tracks with CSS animation; classic Namaz Guide restored with Arabic, Bangla pronunciation, Surah examples and Dua Qunoot; local profile appears immediately in Leaderboard and cached public users are merged while online sync is pending."
+          gh release delete v1.6.2 --yes || true
+          git tag -d v1.6.2 2>/dev/null || true
+          git push origin :refs/tags/v1.6.2 2>/dev/null || true
+          gh release create v1.6.2 Namaz-Orbit-v1.6.2.apk --target main --title "Namaz Orbit v1.6.2" --notes "v1.6.2: Prayer Calendar shows Start and End time; compass N marker replaced by Qibla/Kaaba icon; fixed prayer-end warning 20 minutes before window end; notification includes Complete action that marks the correct prayer complete and cancels remaining reminders."
