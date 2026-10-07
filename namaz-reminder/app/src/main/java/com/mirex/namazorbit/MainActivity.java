@@ -26,6 +26,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.ValueCallback;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -240,8 +241,16 @@ public class MainActivity extends Activity implements SensorEventListener {
             if (resultCode == RESULT_OK && data != null && data.getData() != null) {
                 try (InputStream in = getContentResolver().openInputStream(data.getData())) {
                     if (in != null) {
-                        byte[] bytes = in.readAllBytes();
-                        if (bytes.length > 3_000_000) throw new IllegalArgumentException("Backup too large");
+                        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                        byte[] chunk = new byte[8192];
+                        int read;
+                        int total = 0;
+                        while ((read = in.read(chunk)) != -1) {
+                            total += read;
+                            if (total > 3_000_000) throw new IllegalArgumentException("Backup too large");
+                            buffer.write(chunk, 0, read);
+                        }
+                        byte[] bytes = buffer.toByteArray();
                         String json = new String(bytes, StandardCharsets.UTF_8);
                         String encoded = android.util.Base64.encodeToString(
                                 json.getBytes(StandardCharsets.UTF_8),
