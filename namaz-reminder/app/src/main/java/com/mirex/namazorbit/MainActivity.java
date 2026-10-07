@@ -395,6 +395,48 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
         @JavascriptInterface
+        public boolean canDrawDhikrOverlay() {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context);
+        }
+
+        @JavascriptInterface
+        public void requestDhikrOverlayPermission() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)) return;
+            try {
+                Intent i = new Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + context.getPackageName())
+                );
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void startDhikrOverlay(String sequenceJson) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(context)) {
+                requestDhikrOverlayPermission();
+                return;
+            }
+            try {
+                Intent i = new Intent(context, DhikrOverlayService.class);
+                i.setAction(DhikrOverlayService.ACTION_START);
+                i.putExtra("sequence_json", sequenceJson == null ? "[]" : sequenceJson);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i);
+                else context.startService(i);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void stopDhikrOverlay() {
+            try {
+                Intent i = new Intent(context, DhikrOverlayService.class);
+                i.setAction(DhikrOverlayService.ACTION_STOP);
+                context.startService(i);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
         public boolean hasFineLocationPermission() {
             return Build.VERSION.SDK_INT < 23 ||
                     context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
