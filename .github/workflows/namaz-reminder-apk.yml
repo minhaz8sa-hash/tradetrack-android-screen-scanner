@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v1.7.0 JavaScript syntax
+      - name: Check v1.7.1 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -40,6 +40,7 @@ jobs:
           node --check web/app14.js
           node --check web/app15.js
           node --check web/app16.js
+          node --check web/app17.js
           node --check web/api/leaderboard.js
 
       - name: Set up JDK 17
@@ -69,13 +70,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.7.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v1.7.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v1.7.0
-          path: namaz-reminder/Namaz-Orbit-v1.7.0.apk
+          name: Namaz-Orbit-v1.7.1
+          path: namaz-reminder/Namaz-Orbit-v1.7.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -84,7 +85,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v1.7.0 --yes || true
-          git tag -d v1.7.0 2>/dev/null || true
-          git push origin :refs/tags/v1.7.0 2>/dev/null || true
-          gh release create v1.7.0 Namaz-Orbit-v1.7.0.apk --target main --title "Namaz Orbit v1.7.0" --notes "v1.7.0 Phase 1: Prayer Accuracy Center, live Qibla Calibration with sensor quality and turn guidance, optional After-Prayer Dhikr tracker (33/33/34), and Android Home Widget showing next prayer, countdown/start time and Qibla bearing. Existing Orbit/Qaza/Alarm/Calendar/Profile flows retained."
+          gh release delete v1.7.1 --yes || true
+          git tag -d v1.7.1 2>/dev/null || true
+          git push origin :refs/tags/v1.7.1 2>/dev/null || true
+          gh release create v1.7.1 Namaz-Orbit-v1.7.1.apk --target main --title "Namaz Orbit v1.7.1" --notes "v1.7.1 Phase 2: Prayer Insights (7/30 day stats, streaks, on-time and Qaza recovery), per-prayer Smart Reminder Center for Start/10m-before/End-20 alerts, polished prayer-complete to optional Dhikr flow, and richer Android Home Widget with current prayer and Qaza due count."
