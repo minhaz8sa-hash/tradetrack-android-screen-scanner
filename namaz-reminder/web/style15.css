@@ -1,0 +1,33 @@
+/* Namaz Orbit v1.7.1 — Insights + Smart Reminders */
+.insights171{margin-bottom:14px}
+.ins-head171{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.ins-head171 h3{margin:0}.ins-head171 small{display:block;color:var(--muted);font-size:9px;line-height:1.45;margin-top:3px}
+.ins-tabs171{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+.ins-tab171{padding:9px;border-radius:13px;border:1px solid rgba(142,240,207,.12);background:rgba(255,255,255,.025);color:var(--muted);font-weight:700}
+.ins-tab171.active{color:var(--accent);background:rgba(142,240,207,.10);border-color:rgba(142,240,207,.30)}
+.ins-grid171{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:11px}
+.ins-stat171{padding:10px 5px;border-radius:14px;text-align:center;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}
+.ins-stat171 b{display:block;color:var(--accent);font-size:16px}.ins-stat171 span{display:block;color:var(--muted);font-size:8px;margin-top:2px}
+.ins-bars171{display:grid;gap:8px;margin-top:12px}
+.ins-row171{display:grid;grid-template-columns:74px 1fr 42px;gap:8px;align-items:center}
+.ins-row171>span{font-size:10px;color:#e7fff7}.ins-row171>small{font-size:8px;color:var(--muted);text-align:right}
+.ins-bar171{height:8px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.ins-bar171 i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),rgba(142,240,207,.46))}
+.ins-note171{margin-top:10px;padding:10px;border-radius:13px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);font-size:9px;line-height:1.55;color:var(--muted)}
+.smart171{margin-bottom:14px}
+.smart171 h3{margin:0}.smart171>.meta{margin-top:3px}
+.smart-list171{display:grid;gap:8px;margin-top:12px}
+.smart-row171{padding:10px;border-radius:16px;border:1px solid rgba(255,255,255,.075);background:rgba(255,255,255,.025)}
+.smart-top171{display:flex;align-items:center;gap:9px}.smart-top171 .ico{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:rgba(142,240,207,.05);border:1px solid rgba(142,240,207,.10)}
+.smart-top171 .ico svg{width:27px;height:27px}.smart-top171 b{font-size:12px}
+.smart-options171{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px}
+.smart-opt171{display:flex;align-items:center;justify-content:center;gap:5px;padding:8px 5px;border-radius:11px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);font-size:8px;color:var(--muted)}
+.smart-opt171 input{width:16px;height:16px;accent-color:#8ef0cf}
+.smart-save171{margin-top:10px}
+.complete-sheet171{position:fixed;inset:0;z-index:7100;display:none;align-items:flex-end;justify-content:center;padding:18px;background:rgba(0,8,6,.70)}
+.complete-sheet171.open{display:flex}
+.complete-panel171{width:min(100%,520px);padding:18px;border-radius:26px;background:linear-gradient(155deg,rgba(21,62,51,.98),rgba(5,25,20,.995));border:1px solid rgba(142,240,207,.18);box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.complete-check171{width:54px;height:54px;border-radius:18px;display:grid;place-items:center;background:rgba(142,240,207,.12);border:1px solid rgba(142,240,207,.26);color:var(--accent);font-size:28px;margin-bottom:10px}
+.complete-panel171 h3{margin:0}.complete-panel171 p{margin:6px 0 0;color:var(--muted);font-size:10px;line-height:1.55}
+.complete-actions171{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+@media(max-width:390px){.ins-grid171{grid-template-columns:repeat(2,1fr)}.smart-options171{grid-template-columns:1fr}}
