@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Namaz Orbit</string>
+    <string name="widget_description">Next prayer, countdown and Qibla</string>
 </resources>
