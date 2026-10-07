@@ -382,6 +382,19 @@ public class MainActivity extends Activity implements SensorEventListener {
         }
 
         @JavascriptInterface
+        public void updatePrayerWidgetV2(String nextPrayer, String startTime, String countdown, double qiblaBearing, int qazaDue, String currentPrayer) {
+            PrayerWidgetProvider.storeAndUpdateV2(
+                    context,
+                    nextPrayer == null ? "Next prayer" : nextPrayer,
+                    startTime == null ? "—" : startTime,
+                    countdown == null ? "—" : countdown,
+                    qiblaBearing,
+                    qazaDue,
+                    currentPrayer == null ? "Between prayers" : currentPrayer
+            );
+        }
+
+        @JavascriptInterface
         public boolean hasFineLocationPermission() {
             return Build.VERSION.SDK_INT < 23 ||
                     context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
