@@ -42,6 +42,9 @@ public class MainActivity extends Activity implements SensorEventListener {
     private boolean hasSmoothedHeading = false;
     private double smoothedHeadingSin = 0.0;
     private double smoothedHeadingCos = 1.0;
+    private boolean pageLoaded = false;
+    private String pendingCompleteDateKey = null;
+    private String pendingCompletePrayerKey = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +63,13 @@ public class MainActivity extends Activity implements SensorEventListener {
         s.setAllowContentAccess(true);
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                pageLoaded = true;
+                applyPendingPrayerComplete();
+            }
+        });
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
@@ -90,12 +99,45 @@ public class MainActivity extends Activity implements SensorEventListener {
         });
 
         web.addJavascriptInterface(new AndroidBridge(this), "AndroidBridge");
+        handlePrayerCompleteIntent(getIntent());
         requestNotificationPermission();
 
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
         web.loadUrl("file:///android_asset/index.html");
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handlePrayerCompleteIntent(intent);
+    }
+
+    private void handlePrayerCompleteIntent(Intent intent) {
+        if (intent == null || !PrayerAlarmReceiver.ACTION_COMPLETE.equals(intent.getAction())) return;
+        String dateKey = intent.getStringExtra("date_key");
+        String prayerKey = intent.getStringExtra("prayer_key");
+        if (dateKey == null || prayerKey == null) return;
+        if (!dateKey.matches("\\d{4}-\\d{2}-\\d{2}")) return;
+        if (!prayerKey.matches("fajr|dhuhr|asr|maghrib|isha")) return;
+        pendingCompleteDateKey = dateKey;
+        pendingCompletePrayerKey = prayerKey;
+        applyPendingPrayerComplete();
+    }
+
+    private void applyPendingPrayerComplete() {
+        if (!pageLoaded || web == null || pendingCompleteDateKey == null || pendingCompletePrayerKey == null) return;
+        final String dateKey = pendingCompleteDateKey;
+        final String prayerKey = pendingCompletePrayerKey;
+        pendingCompleteDateKey = null;
+        pendingCompletePrayerKey = null;
+        web.post(() -> web.evaluateJavascript(
+                "if(window.markComplete){markComplete('" + dateKey + "','" + prayerKey + "',false);" +
+                "if(window.showPage){showPage('home');}}",
+                null
+        ));
     }
 
     @Override
