@@ -15,8 +15,16 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class PrayerAlarmReceiver extends BroadcastReceiver {
-    private static final String ACTION_DISMISS = "com.mirex.namazorbit.DISMISS_ALARM";
+    public static final String ACTION_DISMISS = "com.mirex.namazorbit.DISMISS_ALARM";
+    public static final String ACTION_COMPLETE = "com.mirex.namazorbit.COMPLETE_PRAYER";
+
+    private static final Pattern PRAYER_EVENT = Pattern.compile(
+            "^NO_(\\d{4}-\\d{2}-\\d{2})_(fajr|dhuhr|asr|maghrib|isha)_(start|end_20)$"
+    );
 
     private static Vibrator getVibrator(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -41,14 +49,41 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
         if (vibrator != null) vibrator.cancel();
     }
 
+    private static String[] parsePrayerTarget(String eventId) {
+        if (eventId == null) return null;
+        Matcher m = PRAYER_EVENT.matcher(eventId);
+        if (!m.matches()) return null;
+        return new String[]{m.group(1), m.group(2)};
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        String action = intent.getAction();
 
-        if (ACTION_DISMISS.equals(intent.getAction())) {
+        if (ACTION_DISMISS.equals(action)) {
             int notificationId = intent.getIntExtra("notification_id", -1);
             stopAlarmVibration(context);
             if (notificationId >= 0) nm.cancel(notificationId);
+            return;
+        }
+
+        if (ACTION_COMPLETE.equals(action)) {
+            int notificationId = intent.getIntExtra("notification_id", -1);
+            String dateKey = intent.getStringExtra("date_key");
+            String prayerKey = intent.getStringExtra("prayer_key");
+
+            stopAlarmVibration(context);
+            if (notificationId >= 0) nm.cancel(notificationId);
+
+            if (dateKey != null && prayerKey != null) {
+                Intent open = new Intent(context, MainActivity.class);
+                open.setAction(ACTION_COMPLETE);
+                open.putExtra("date_key", dateKey);
+                open.putExtra("prayer_key", prayerKey);
+                open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                context.startActivity(open);
+            }
             return;
         }
 
@@ -66,7 +101,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
 
         if (vibrate) startAlarmVibration(context);
 
-        String channelId = "prayer_v4_" + sound + "_" + (vibrate ? "v" : "n");
+        String channelId = "prayer_v5_" + sound + "_" + (vibrate ? "v" : "n");
         Uri uri = "notification".equals(sound)
                 ? Settings.System.DEFAULT_NOTIFICATION_URI
                 : Settings.System.DEFAULT_ALARM_ALERT_URI;
@@ -91,7 +126,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
         }
 
         Intent open = new Intent(context, MainActivity.class);
-        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        open.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent content = PendingIntent.getActivity(
                 context,
                 1001,
@@ -109,6 +144,22 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        String[] target = parsePrayerTarget(eventId);
+        PendingIntent completePending = null;
+        if (target != null) {
+            Intent complete = new Intent(context, PrayerAlarmReceiver.class);
+            complete.setAction(ACTION_COMPLETE);
+            complete.putExtra("notification_id", notificationId);
+            complete.putExtra("date_key", target[0]);
+            complete.putExtra("prayer_key", target[1]);
+            completePending = PendingIntent.getBroadcast(
+                    context,
+                    notificationId + 7000,
+                    complete,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+        }
+
         Notification.Builder b = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? new Notification.Builder(context, channelId)
                 : new Notification.Builder(context);
@@ -122,8 +173,13 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
                 .setOnlyAlertOnce(true)
                 .setPriority(Notification.PRIORITY_MAX)
                 .setCategory(Notification.CATEGORY_ALARM)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending);
+                .setVisibility(Notification.VISIBILITY_PUBLIC);
+
+        if (completePending != null) {
+            b.addAction(android.R.drawable.checkbox_on_background, "Complete", completePending);
+        }
+        b.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending);
+
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             if (!"silent".equals(sound)) b.setSound(uri);
             if (vibrate) b.setVibrate(new long[]{0, 450, 180, 450});
