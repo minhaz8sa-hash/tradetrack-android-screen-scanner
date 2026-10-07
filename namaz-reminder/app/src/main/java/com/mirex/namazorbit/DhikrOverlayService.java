@@ -9,6 +9,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -20,6 +23,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -41,9 +45,47 @@ public class DhikrOverlayService extends Service {
     private TextView countView;
     private TextView labelView;
     private TextView targetView;
+    private ProgressRingView progressRing;
     private final List<Item> items = new ArrayList<>();
     private int index = 0;
     private int count = 0;
+
+    static class ProgressRingView extends View {
+        private final Paint base = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint arc = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float progress = 0f;
+
+        ProgressRingView(Context context) {
+            super(context);
+            base.setStyle(Paint.Style.STROKE);
+            arc.setStyle(Paint.Style.STROKE);
+            base.setStrokeWidth(dpStatic(context, 4));
+            arc.setStrokeWidth(dpStatic(context, 4));
+            base.setColor(Color.argb(45, 142, 240, 207));
+            arc.setColor(Color.rgb(142, 240, 207));
+            base.setStrokeCap(Paint.Cap.ROUND);
+            arc.setStrokeCap(Paint.Cap.ROUND);
+            setWillNotDraw(false);
+        }
+
+        void setProgress(float p) {
+            progress = Math.max(0f, Math.min(1f, p));
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float pad = dpStatic(getContext(), 5);
+            RectF r = new RectF(pad, pad, getWidth() - pad, getHeight() - pad);
+            canvas.drawArc(r, -90f, 360f, false, base);
+            canvas.drawArc(r, -90f, 360f * progress, false, arc);
+        }
+
+        private static float dpStatic(Context c, int v) {
+            return v * c.getResources().getDisplayMetrics().density;
+        }
+    }
 
     static class Item {
         String label;
@@ -156,6 +198,14 @@ public class DhikrOverlayService extends Service {
     }
 
     private void createBubble() {
+        FrameLayout shell = new FrameLayout(this);
+        shell.setClipChildren(false);
+        shell.setClipToPadding(false);
+
+        progressRing = new ProgressRingView(this);
+        FrameLayout.LayoutParams ringLp = new FrameLayout.LayoutParams(dp(100), dp(100), Gravity.CENTER);
+        shell.addView(progressRing, ringLp);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
@@ -184,11 +234,14 @@ public class DhikrOverlayService extends Service {
         root.addView(labelView, new LinearLayout.LayoutParams(dp(78), dp(18)));
         root.addView(targetView, new LinearLayout.LayoutParams(dp(78), dp(16)));
 
+        FrameLayout.LayoutParams rootLp = new FrameLayout.LayoutParams(dp(88), dp(88), Gravity.CENTER);
+        shell.addView(root, rootLp);
+
         int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
         params = new WindowManager.LayoutParams(
-                dp(92), dp(92), type,
+                dp(104), dp(104), type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
@@ -200,7 +253,7 @@ public class DhikrOverlayService extends Service {
         params.y = p.getInt("y", dp(430));
 
         final int slop = ViewConfiguration.get(this).getScaledTouchSlop();
-        root.setOnTouchListener(new View.OnTouchListener() {
+        shell.setOnTouchListener(new View.OnTouchListener() {
             float downX, downY;
             int startX, startY;
             boolean moved;
@@ -239,7 +292,7 @@ public class DhikrOverlayService extends Service {
             }
         });
 
-        bubble = root;
+        bubble = shell;
         windowManager.addView(bubble, params);
     }
 
@@ -268,12 +321,14 @@ public class DhikrOverlayService extends Service {
             countView.setText("✓");
             labelView.setText("Complete");
             targetView.setText("Tap to restart");
+            if (progressRing != null) progressRing.setProgress(1f);
             return;
         }
         Item item = items.get(index);
         countView.setText(String.valueOf(count));
         labelView.setText(item.label);
         targetView.setText("of " + item.target);
+        if (progressRing != null) progressRing.setProgress((float) count / (float) Math.max(1, item.target));
     }
 
     @Override
