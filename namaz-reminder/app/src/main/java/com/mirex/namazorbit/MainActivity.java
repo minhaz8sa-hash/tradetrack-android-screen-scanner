@@ -42,6 +42,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     private boolean hasSmoothedHeading = false;
     private double smoothedHeadingSin = 0.0;
     private double smoothedHeadingCos = 1.0;
+    private volatile int compassAccuracy = SensorManager.SENSOR_STATUS_UNRELIABLE;
     private boolean pageLoaded = false;
     private String pendingCompleteDateKey = null;
     private String pendingCompletePrayerKey = null;
@@ -307,7 +308,18 @@ public class MainActivity extends Activity implements SensorEventListener {
         ));
     }
 
-    @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        if (sensor == null || sensor.getType() != Sensor.TYPE_ROTATION_VECTOR) return;
+        compassAccuracy = accuracy;
+        if (web != null) {
+            final int a = accuracy;
+            web.post(() -> web.evaluateJavascript(
+                    "window.onNativeCompassAccuracy && window.onNativeCompassAccuracy(" + a + ");",
+                    null
+            ));
+        }
+    }
 
     public class AndroidBridge {
         private final Context context;
@@ -350,6 +362,23 @@ public class MainActivity extends Activity implements SensorEventListener {
         public void setCompassLocation(double lat, double lon) {
             compassLat = lat;
             compassLon = lon;
+        }
+
+        @JavascriptInterface
+        public int getCompassAccuracy() { return compassAccuracy; }
+
+        @JavascriptInterface
+        public boolean hasRotationSensor() { return rotationSensor != null; }
+
+        @JavascriptInterface
+        public void updatePrayerWidget(String nextPrayer, String startTime, String countdown, double qiblaBearing) {
+            PrayerWidgetProvider.storeAndUpdate(
+                    context,
+                    nextPrayer == null ? "Next prayer" : nextPrayer,
+                    startTime == null ? "—" : startTime,
+                    countdown == null ? "—" : countdown,
+                    qiblaBearing
+            );
         }
 
         @JavascriptInterface
