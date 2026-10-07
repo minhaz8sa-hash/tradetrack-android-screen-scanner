@@ -1,0 +1,65 @@
+/* Namaz Orbit v2.0.0 — Quran pronunciation, backup, admin mosque registry, Dhikr progress */
+.quran-pron183{
+  margin-top:10px;padding:10px 12px;border-radius:13px;
+  background:rgba(142,240,207,.045);border:1px solid rgba(142,240,207,.10);
+  color:#dff6ed;font-size:13px;line-height:1.72
+}
+.quran-pron-label183{display:block;font-size:8px;color:var(--accent);margin-bottom:4px;font-weight:700}
+.quran-pron-note183{font-size:8px;color:var(--muted);margin:8px 0 0;line-height:1.45}
+
+#dhikrFloat181{--dhikrP:0deg}
+#dhikrFloat181::before{
+  content:"";position:absolute;inset:-6px;border-radius:50%;z-index:-1;
+  background:conic-gradient(var(--accent) var(--dhikrP),rgba(142,240,207,.08) 0);
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));
+  mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));
+  filter:drop-shadow(0 0 5px rgba(142,240,207,.25));
+  transition:background .16s linear;
+}
+#dhikrFloat181.show{animation:dhikrFloatIntro183 .28s ease-out}
+@keyframes dhikrFloatIntro183{from{opacity:0;transform:scale(.72)}to{opacity:1;transform:scale(1)}}
+.dhikr-float-circle181.tap{animation:dhikrTap183 .16s ease-out}
+@keyframes dhikrTap183{0%{transform:scale(1)}50%{transform:scale(.90)}100%{transform:scale(1)}}
+
+.backup183{margin-bottom:14px}
+.backup-actions183{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.backup183 .notice{margin-top:9px}
+
+.about183{margin-bottom:14px}
+.admin-unlock183{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.admin-unlock183 input{min-width:0}
+.admin-status183{margin-top:7px;font-size:8px;color:var(--muted)}
+.admin-status183.error{color:#ff9f9f}.admin-status183.ok{color:var(--accent)}
+
+.admin-panel183{display:none;margin-bottom:14px}
+.admin-panel183.open{display:block}
+.admin-head183{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.admin-head183 h3{margin:0}
+.admin-form183{display:grid;gap:9px;margin-top:12px}
+.admin-image183{display:grid;grid-template-columns:76px 1fr;gap:10px;align-items:center}
+.admin-image-preview183{width:76px;height:76px;border-radius:18px;overflow:hidden;display:grid;place-items:center;border:1px solid rgba(142,240,207,.14);background:rgba(255,255,255,.025)}
+.admin-image-preview183 img{width:100%;height:100%;object-fit:cover}
+.admin-times183{display:grid;gap:7px}
+.admin-time-row183{display:grid;grid-template-columns:72px 1fr 1fr;gap:7px;align-items:center;padding:8px;border-radius:13px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02)}
+.admin-time-row183 b{font-size:9px}
+.admin-time-row183 label{font-size:7px;color:var(--muted)}
+.admin-time-row183 input{width:100%;margin-top:3px;padding:7px;border-radius:9px;border:1px solid rgba(142,240,207,.10);background:rgba(3,18,14,.6);color:var(--text)}
+.admin-list183{display:grid;gap:8px;margin-top:12px}
+.admin-mosque183{display:grid;grid-template-columns:48px 1fr auto;gap:9px;align-items:center;padding:9px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}
+.admin-mosque183 img{width:48px;height:48px;border-radius:13px;object-fit:cover;background:rgba(255,255,255,.04)}
+.admin-mosque183 b{display:block;font-size:10px}.admin-mosque183 small{display:block;font-size:7px;color:var(--muted);margin-top:2px}
+
+.registry183{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
+.registry-actions183{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.registry-list183{display:grid;gap:8px;margin-top:9px}
+.registry-row183{display:grid;grid-template-columns:48px 1fr auto;gap:9px;align-items:center;padding:9px;border-radius:14px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}
+.registry-row183 img{width:48px;height:48px;border-radius:13px;object-fit:cover;background:rgba(255,255,255,.03)}
+.registry-row183 b{display:block;font-size:10px}.registry-row183 small{display:block;font-size:7px;color:var(--muted);margin-top:2px}
+.registry-select183{padding:7px 9px;border-radius:10px;border:1px solid rgba(142,240,207,.18);background:rgba(142,240,207,.07);color:var(--accent);font-size:8px}
+.registry-select183.selected{background:rgba(142,240,207,.17);color:#effff9}
+.mosque-alert183{margin-top:6px;color:#f2d58a;font-size:8px}
+
+@media(max-width:390px){
+  .backup-actions183,.registry-actions183{grid-template-columns:1fr}
+  .admin-time-row183{grid-template-columns:58px 1fr 1fr}
+}
