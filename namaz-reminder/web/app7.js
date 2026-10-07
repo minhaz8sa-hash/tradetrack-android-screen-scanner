@@ -143,23 +143,41 @@ function updateCountdownV13(){
 }
 updateCountdown=updateCountdownV13;
 
+function smartReminderRules171(){
+  var defaults={};
+  PRAYERS.forEach(function(p){defaults[p.key]={start:true,pre:true,end:true}});
+  var raw=settings&&settings.smartRules;
+  if(!raw||typeof raw!=='object')return defaults;
+  PRAYERS.forEach(function(p){
+    var r=raw[p.key]||{};
+    defaults[p.key]={start:r.start!==false,pre:r.pre!==false,end:r.end!==false};
+  });
+  return defaults;
+}
+
 var v13AlarmScheduleSignature='';
 function scheduleAlarmsV13(force){
   if(!window.AndroidBridge)return;
   var baseCtx=prayerCycleContext(),c=coords||{lat:23.8103,lon:90.4125};
-  var sig=baseCtx.key+'|'+c.lat.toFixed(4)+'|'+c.lon.toFixed(4)+'|'+JSON.stringify(settings);
+  var rules=smartReminderRules171();
+  var sig=baseCtx.key+'|'+c.lat.toFixed(4)+'|'+c.lon.toFixed(4)+'|'+JSON.stringify(settings)+'|'+JSON.stringify(rules);
   if(!force&&sig===v13AlarmScheduleSignature)return;
   v13AlarmScheduleSignature=sig;
-  var sound=settings.alarmSound||'alarm',pre=Number(settings.preReminder)||0,vibrate=settings.vibration!==false;
+  var sound=settings.alarmSound||'alarm',pre=Number(settings.preReminder)||10,vibrate=settings.vibration!==false;
   var base=baseCtx.baseDate;
   for(var offset=0;offset<3;offset++){
     var d=new Date(base);d.setDate(d.getDate()+offset);var times=computePrayerTimes(d),nd=new Date(d);nd.setDate(nd.getDate()+1);var nextTimes=computePrayerTimes(nd),k=dateKey(d);
     PRAYERS.forEach(function(p){
+      var rule=rules[p.key]||{start:true,pre:true,end:true};
       var start=times[p.key],at=actualEpochForWallDate(start),end=endForPrayer(times,p.key,nextTimes),endAt=actualEpochForWallDate(end);
-      if(at>Date.now()+1000){try{if(window.AndroidBridge.scheduleAlarmV2)window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_start',p.bn+' • '+p.name,'নামাজের সময় শুরু হয়েছে।',at,sound,vibrate)}catch(e){}
-        if(pre>0&&at-pre*60000>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_pre',p.bn+' '+pre+' মিনিট পরে','আর '+pre+' মিনিট পরে '+p.bn+' শুরু হবে।',at-pre*60000,sound,vibrate)}catch(e){}}
+      if(at>Date.now()+1000){
+        if(rule.start){try{if(window.AndroidBridge.scheduleAlarmV2)window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_start',p.bn+' • '+p.name,'নামাজের সময় শুরু হয়েছে।',at,sound,vibrate)}catch(e){}}
+        if(rule.pre&&pre>0&&at-pre*60000>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_pre',p.bn+' '+pre+' মিনিট পরে','আর '+pre+' মিনিট পরে '+p.bn+' শুরু হবে।',at-pre*60000,sound,vibrate)}catch(e){}}
       }
-      if(settings.endReminder!==false){var mins=20,when=endAt-mins*60000;if(when>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_end_20','⚠ '+p.bn+' • সময় শেষ হতে ২০ মিনিট','নামাজের সময় শেষ হয়ে যাচ্ছে। নামাজ complete করে থাকলে Complete দিন।',when,sound,vibrate)}catch(e){}}}
+      if(rule.end&&settings.endReminder!==false){
+        var mins=20,when=endAt-mins*60000;
+        if(when>Date.now()+1000){try{window.AndroidBridge.scheduleAlarmV2('NO_'+k+'_'+p.key+'_end_20','⚠ '+p.bn+' • সময় শেষ হতে ২০ মিনিট','নামাজের সময় শেষ হয়ে যাচ্ছে। নামাজ complete করে থাকলে Complete দিন।',when,sound,vibrate)}catch(e){}}
+      }
     });
   }
 }
