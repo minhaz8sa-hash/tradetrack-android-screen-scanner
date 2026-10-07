@@ -169,7 +169,10 @@ function closeDhikr170(){var s=document.getElementById('dhikrSheet170');if(s)s.c
       var before=getDayState(k)[key]||'pending';
       var out=oldMark170.apply(this,arguments);
       if(!isQaza&&before!=='complete'&&before!=='qaza-complete'){
-        setTimeout(function(){openDhikr170(true)},180);
+        setTimeout(function(){
+          if(typeof window.showPrayerCompleteFlow171==='function')window.showPrayerCompleteFlow171(key);
+          else openDhikr170(true);
+        },180);
       }
       syncWidget170(true);renderAccuracy170();return out;
     };
