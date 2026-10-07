@@ -1,0 +1,84 @@
+/* Namaz Orbit v1.8.0 — Phase 3 Mosque Mode + Dhikr tap circle */
+
+/* Keep Dhikr fully above Android system navigation controls. */
+.dhikr-sheet170{
+  align-items:flex-end!important;
+  padding:14px 16px max(82px,calc(18px + env(safe-area-inset-bottom)))!important;
+  overflow:hidden!important;
+}
+.dhikr-panel170{
+  max-height:calc(100dvh - 118px)!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  scrollbar-width:none;
+}
+.dhikr-panel170::-webkit-scrollbar{display:none}
+
+.dhikr-circle-wrap180{
+  display:grid;
+  place-items:center;
+  padding:14px 0 8px;
+}
+.dhikr-circle180{
+  width:156px;
+  height:156px;
+  border-radius:50%;
+  border:2px solid rgba(142,240,207,.40);
+  background:
+    radial-gradient(circle at 35% 28%,rgba(142,240,207,.17),rgba(8,37,30,.96) 55%,rgba(4,21,17,.99));
+  box-shadow:
+    0 0 0 8px rgba(142,240,207,.035),
+    0 0 34px rgba(142,240,207,.16),
+    inset 0 0 30px rgba(142,240,207,.08);
+  color:#effff9;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+  user-select:none;
+}
+.dhikr-circle180:active{transform:scale(.965)}
+.dhikr-circle180 .dc-label180{font-size:10px;color:var(--muted);max-width:118px;text-align:center}
+.dhikr-circle180 .dc-count180{font-size:32px;line-height:1;font-weight:850;color:var(--accent);font-variant-numeric:tabular-nums}
+.dhikr-circle180 .dc-target180{font-size:9px;color:#d8e8e2}
+.dhikr-circle180.complete{border-color:#8ef0cf;box-shadow:0 0 36px rgba(142,240,207,.32),inset 0 0 34px rgba(142,240,207,.10)}
+.dhikr-tap-help180{text-align:center;color:var(--muted);font-size:8px;margin-top:7px}
+.dhikr-row170.active180{border-color:rgba(142,240,207,.30);background:rgba(142,240,207,.06)}
+
+/* Mosque / Jamaat Mode */
+.mosque180{margin-bottom:14px}
+.mosque-head180{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.mosque-head180 h3{margin:0}
+.mosque-head180 small{display:block;color:var(--muted);font-size:9px;line-height:1.5;margin-top:3px}
+.mosque-switch180{width:20px;height:20px;accent-color:#8ef0cf}
+.mosque-name180{margin-top:12px}
+.mosque-times180{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mosque-time180{padding:10px;border-radius:15px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025)}
+.mosque-time180 label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:#eafff8}
+.mosque-time180 input{
+  min-width:108px;padding:8px 9px;border-radius:11px;
+  border:1px solid rgba(142,240,207,.14);
+  background:rgba(3,18,14,.62);color:var(--text);
+}
+.mosque-jummah180{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.mosque-actions180{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}
+.mosque-home-chip180{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-top:5px;padding:4px 7px;border-radius:9px;
+  border:1px solid rgba(242,213,138,.15);
+  background:rgba(242,213,138,.055);color:#f2d58a;
+  font-size:9px;
+}
+.mosque-next180{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  margin-top:6px;color:#f2d58a;font-size:9px;
+}
+.mosque-summary180{margin-top:9px;padding:10px 11px;border-radius:13px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.02);font-size:9px;color:var(--muted);line-height:1.55}
+
+@media(max-width:390px){
+  .dhikr-circle180{width:142px;height:142px}
+  .mosque-times180,.mosque-jummah180{grid-template-columns:1fr}
+}
