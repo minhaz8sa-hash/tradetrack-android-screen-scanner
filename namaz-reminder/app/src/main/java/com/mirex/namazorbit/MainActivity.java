@@ -26,10 +26,16 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.webkit.ValueCallback;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+
 public class MainActivity extends Activity implements SensorEventListener {
     private static final int REQ_LOCATION = 42;
     private static final int REQ_NOTIFICATION = 43;
     private static final int REQ_FILE = 44;
+    private static final int REQ_BACKUP_EXPORT = 45;
+    private static final int REQ_BACKUP_IMPORT = 46;
     private GeolocationPermissions.Callback geoCallback;
     private String geoOrigin;
     private ValueCallback<Uri[]> filePathCallback;
@@ -46,6 +52,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     private boolean pageLoaded = false;
     private String pendingCompleteDateKey = null;
     private String pendingCompletePrayerKey = null;
+    private String pendingBackupJson = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -201,10 +208,56 @@ public class MainActivity extends Activity implements SensorEventListener {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == REQ_FILE && filePathCallback != null) {
             Uri[] results = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
             filePathCallback.onReceiveValue(results);
             filePathCallback = null;
+            return;
+        }
+
+        if (requestCode == REQ_BACKUP_EXPORT) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null && pendingBackupJson != null) {
+                try (OutputStream out = getContentResolver().openOutputStream(data.getData(), "w")) {
+                    if (out != null) {
+                        out.write(pendingBackupJson.getBytes(StandardCharsets.UTF_8));
+                        out.flush();
+                        if (web != null) web.post(() -> web.evaluateJavascript(
+                                "window.onNativeBackupExported && window.onNativeBackupExported(true);", null
+                        ));
+                    }
+                } catch (Exception e) {
+                    if (web != null) web.post(() -> web.evaluateJavascript(
+                            "window.onNativeBackupExported && window.onNativeBackupExported(false);", null
+                    ));
+                }
+            }
+            pendingBackupJson = null;
+            return;
+        }
+
+        if (requestCode == REQ_BACKUP_IMPORT) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                try (InputStream in = getContentResolver().openInputStream(data.getData())) {
+                    if (in != null) {
+                        byte[] bytes = in.readAllBytes();
+                        if (bytes.length > 3_000_000) throw new IllegalArgumentException("Backup too large");
+                        String json = new String(bytes, StandardCharsets.UTF_8);
+                        String encoded = android.util.Base64.encodeToString(
+                                json.getBytes(StandardCharsets.UTF_8),
+                                android.util.Base64.NO_WRAP
+                        );
+                        if (web != null) web.post(() -> web.evaluateJavascript(
+                                "window.onNativeBackupImported && window.onNativeBackupImported('" + encoded + "');",
+                                null
+                        ));
+                    }
+                } catch (Exception e) {
+                    if (web != null) web.post(() -> web.evaluateJavascript(
+                            "window.onNativeBackupImported && window.onNativeBackupImported('');", null
+                    ));
+                }
+            }
         }
     }
 
@@ -392,6 +445,45 @@ public class MainActivity extends Activity implements SensorEventListener {
                     qazaDue,
                     currentPrayer == null ? "Between prayers" : currentPrayer
             );
+        }
+
+        @JavascriptInterface
+        public void exportBackupJson(String json) {
+            pendingBackupJson = json == null ? "{}" : json;
+            try {
+                Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("application/json");
+                i.putExtra(Intent.EXTRA_TITLE, "Namaz-Orbit-backup.json");
+                startActivityForResult(i, REQ_BACKUP_EXPORT);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void importBackupJson() {
+            try {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("application/json");
+                startActivityForResult(i, REQ_BACKUP_IMPORT);
+            } catch (Exception ignored) {}
+        }
+
+        @JavascriptInterface
+        public void openGoogleMapsMosques(double lat, double lon) {
+            try {
+                Uri geo = Uri.parse("geo:" + lat + "," + lon + "?q=mosque");
+                Intent maps = new Intent(Intent.ACTION_VIEW, geo);
+                maps.setPackage("com.google.android.apps.maps");
+                try {
+                    startActivity(maps);
+                } catch (Exception first) {
+                    Uri webUri = Uri.parse("https://www.google.com/maps/search/mosque/@"
+                            + lat + "," + lon + ",14z");
+                    Intent browser = new Intent(Intent.ACTION_VIEW, webUri);
+                    startActivity(browser);
+                }
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
