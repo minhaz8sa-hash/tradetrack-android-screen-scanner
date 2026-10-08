@@ -22,9 +22,11 @@ async function render(s={}){
     : "Open a supported Quotex trading tab.";
 
   if(s.finalState==="SIGNAL"){
-    signal.textContent="NEXT "+(s.signalDirection||s.heldDirection||"")+"\n↑"+(s.heldUp??"—")+"%  ↓"+(s.heldDown??"—")+"%";
+    const entry=Date.parse(s.entryAt);
+    signal.textContent=Date.now()>=entry ? "ENTRY WINDOW CLOSED — wait for a new scan" :
+      "NEXT CANDLE "+(s.signalDirection||"")+"\n"+(s.asset||"")+"\nEntry "+new Date(entry).toLocaleTimeString()+"\nEnd "+new Date(s.expiresAt).toLocaleTimeString();
   }else if(s.lastScan){
-    signal.textContent="Scanning NEXT candle\n↑"+Math.round(s.lastScan.upConfirmation||50)+"%  ↓"+Math.round(s.lastScan.downConfirmation||50)+"%";
+    signal.textContent="Verifying next candle — wait for final signal";
   }else{
     signal.textContent=s.reason||s.lastError||"No scan running.";
   }
@@ -53,3 +55,8 @@ document.getElementById("arm").addEventListener("click",async()=>{
 chrome.storage.onChanged.addListener((changes,area)=>{
   if(area==="local"&&changes.ttlPcScannerStatus) render(changes.ttlPcScannerStatus.newValue||{});
 });
+const url=document.createElement('input'), token=document.createElement('input'),save=document.createElement('button');
+url.placeholder='https://your-backend/analyze';token.placeholder='Scanner access token';token.type='password';save.textContent='Save backend settings';
+for(const el of [url,token,save])document.body.appendChild(el);
+chrome.storage.local.get(['backendUrl','scannerToken']).then(s=>{url.value=s.backendUrl||'';token.value=s.scannerToken||'';});
+save.onclick=async()=>{try{const u=new URL(url.value);if(u.protocol!=='https:')throw Error();await chrome.permissions.request({origins:[u.origin+'/*']}).then(async granted=>{if(granted){await chrome.storage.local.set({backendUrl:url.value.trim(),scannerToken:token.value.trim()});meta.textContent='Backend settings saved';}});}catch{meta.textContent='Enter a valid HTTPS backend URL';}};
