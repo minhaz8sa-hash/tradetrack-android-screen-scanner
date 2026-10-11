@@ -51,7 +51,7 @@
         android:textSize="18sp"
         android:textStyle="bold" />
 
-    <TextView
+    <Chronometer
         android:id="@+id/widget_countdown"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
