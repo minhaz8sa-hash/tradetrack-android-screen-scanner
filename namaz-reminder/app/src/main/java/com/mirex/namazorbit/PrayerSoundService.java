@@ -37,9 +37,7 @@ public class PrayerSoundService extends Service {
 
     public static void stop(Context context) {
         try {
-            Intent i = new Intent(context, PrayerSoundService.class);
-            i.setAction(ACTION_STOP);
-            context.startService(i);
+            context.stopService(new Intent(context, PrayerSoundService.class));
         } catch (Exception ignored) {}
     }
 
