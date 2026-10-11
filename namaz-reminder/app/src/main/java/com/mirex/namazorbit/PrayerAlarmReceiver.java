@@ -49,6 +49,13 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
         if (vibrator != null) vibrator.cancel();
     }
 
+    private static boolean isStrongEvent(String eventId, String sound) {
+        if (eventId == null || "silent".equals(sound)) return false;
+        if (eventId.startsWith("NO_TEST_")) return true;
+        if (eventId.matches("^NO_\\d{4}-\\d{2}-\\d{2}_(fajr|dhuhr|asr|maghrib|isha)_start$")) return true;
+        return eventId.matches("^MOSQUE_.*_(adhan|jamaat)$");
+    }
+
     private static String[] parsePrayerTarget(String eventId) {
         if (eventId == null) return null;
         Matcher m = PRAYER_EVENT.matcher(eventId);
@@ -64,6 +71,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
         if (ACTION_DISMISS.equals(action)) {
             int notificationId = intent.getIntExtra("notification_id", -1);
             stopAlarmVibration(context);
+            PrayerSoundService.stop(context);
             if (notificationId >= 0) nm.cancel(notificationId);
             return;
         }
@@ -74,6 +82,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
             String prayerKey = intent.getStringExtra("prayer_key");
 
             stopAlarmVibration(context);
+            PrayerSoundService.stop(context);
             if (notificationId >= 0) nm.cancel(notificationId);
 
             if (dateKey != null && prayerKey != null) {
@@ -101,7 +110,14 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
 
         if (vibrate) startAlarmVibration(context);
 
-        String channelId = "prayer_v5_" + sound + "_" + (vibrate ? "v" : "n");
+        boolean strongEvent = isStrongEvent(eventId, sound);
+        if (strongEvent) {
+            try { PrayerSoundService.start(context, prayer); } catch (Exception ignored) {}
+        }
+
+        String channelId = strongEvent
+                ? "prayer_v6_strong_" + (vibrate ? "v" : "n")
+                : "prayer_v6_" + sound + "_" + (vibrate ? "v" : "n");
         Uri uri = "notification".equals(sound)
                 ? Settings.System.DEFAULT_NOTIFICATION_URI
                 : Settings.System.DEFAULT_ALARM_ALERT_URI;
@@ -114,7 +130,11 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
             );
             channel.enableVibration(vibrate);
             if (vibrate) channel.setVibrationPattern(new long[]{0, 450, 180, 450});
-            if ("silent".equals(sound)) {
+            NotificationManager policyManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (policyManager != null && policyManager.isNotificationPolicyAccessGranted()) {
+                channel.setBypassDnd(true);
+            }
+            if ("silent".equals(sound) || strongEvent) {
                 channel.setSound(null, null);
             } else {
                 AudioAttributes attrs = new AudioAttributes.Builder()
@@ -181,7 +201,7 @@ public class PrayerAlarmReceiver extends BroadcastReceiver {
         b.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Dismiss", dismissPending);
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            if (!"silent".equals(sound)) b.setSound(uri);
+            if (!"silent".equals(sound) && !strongEvent) b.setSound(uri);
             if (vibrate) b.setVibrate(new long[]{0, 450, 180, 450});
         }
         nm.notify(notificationId, b.build());
