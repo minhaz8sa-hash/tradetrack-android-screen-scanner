@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Check v2.0.0 JavaScript syntax
+      - name: Check v2.0.1 JavaScript syntax
         run: |
           node --check web/app1.js
           node --check web/app2.js
@@ -45,6 +45,7 @@ jobs:
           node --check web/app19.js
           node --check web/app20.js
           node --check web/app21.js
+          node --check web/app22.js
           node --check web/api/leaderboard.js
           node --check web/api/mosques.js
 
@@ -75,13 +76,13 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v2.0.0.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Namaz-Orbit-v2.0.1.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Namaz-Orbit-v2.0.0
-          path: namaz-reminder/Namaz-Orbit-v2.0.0.apk
+          name: Namaz-Orbit-v2.0.1
+          path: namaz-reminder/Namaz-Orbit-v2.0.1.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -90,7 +91,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release delete v2.0.0 --yes || true
-          git tag -d v2.0.0 2>/dev/null || true
-          git push origin :refs/tags/v2.0.0 2>/dev/null || true
-          gh release create v2.0.0 Namaz-Orbit-v2.0.0.apk --target main --title "Namaz Orbit v2.0.0" --notes "v2.0.0: Quran assistive Bangla pronunciation, reliable Backup/Restore plus Android backup rules, automatic in-app Dhikr floating circle with animated progress ring, system overlay progress ring, Google Maps mosque search, shared registered mosque schedules, hidden server-authenticated Mosque Administration, mosque image/Azan/Jamaat/Jummah/Eid/announcement publishing, and selected-mosque Azan/Jamaat alerts."
+          gh release delete v2.0.1 --yes || true
+          git tag -d v2.0.1 2>/dev/null || true
+          git push origin :refs/tags/v2.0.1 2>/dev/null || true
+          gh release create v2.0.1 Namaz-Orbit-v2.0.1.apk --target main --title "Namaz Orbit v2.0.1" --notes "v2.0.1: About box now sends user feedback; exact server-side Jamat text opens hidden Mosque Administration while sentences containing jamat remain feedback. Admin gets feedback inbox. Home Widget uses a live Android countdown Chronometer. Strong Prayer Alarm uses looping ALARM-stream audio with configurable minimum volume, stops on Dismiss/Complete/app open, and offers optional DND alarm access."
