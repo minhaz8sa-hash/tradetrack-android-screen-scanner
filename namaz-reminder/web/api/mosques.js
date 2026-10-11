@@ -1,8 +1,9 @@
-import crypto from 'crypto';
 import { list, put } from '@vercel/blob';
 
 const DATA_PATH='namaz-orbit/mosques.json';
+const FEEDBACK_PATH='namaz-orbit/feedback.json';
 const MAX_MOSQUES=300;
+const MAX_FEEDBACK=1000;
 
 function cors(res){
   res.setHeader('Access-Control-Allow-Origin','*');
@@ -36,19 +37,31 @@ function sanitizeMosque(m={}){
     updatedAt:Date.now()
   };
 }
-async function loadData(){
+async function readBlobJson(path,fallback){
   try{
-    const out=await list({prefix:DATA_PATH,limit:1});
-    const hit=(out.blobs||[]).find(b=>b.pathname===DATA_PATH)||(out.blobs||[])[0];
-    if(!hit)return {mosques:[],updatedAt:0};
-    const r=await fetch(hit.url,{cache:'no-store'});if(!r.ok)return {mosques:[],updatedAt:0};
-    const j=await r.json();return {mosques:Array.isArray(j.mosques)?j.mosques:[],updatedAt:Number(j.updatedAt)||0};
-  }catch(e){return {mosques:[],updatedAt:0}}
+    const out=await list({prefix:path,limit:1});
+    const hit=(out.blobs||[]).find(b=>b.pathname===path)||(out.blobs||[])[0];
+    if(!hit)return fallback;
+    const r=await fetch(hit.url,{cache:'no-store'});if(!r.ok)return fallback;
+    return await r.json();
+  }catch(e){return fallback}
+}
+async function writeBlobJson(path,data){
+  await put(path,JSON.stringify(data),{access:'public',addRandomSuffix:false,allowOverwrite:true,contentType:'application/json'});
+}
+async function loadData(){
+  const j=await readBlobJson(DATA_PATH,{mosques:[],updatedAt:0});
+  return {mosques:Array.isArray(j.mosques)?j.mosques:[],updatedAt:Number(j.updatedAt)||0};
 }
 async function saveData(data){
-  await put(DATA_PATH,JSON.stringify({mosques:data.mosques.slice(0,MAX_MOSQUES),updatedAt:Date.now()}),{
-    access:'public',addRandomSuffix:false,allowOverwrite:true,contentType:'application/json'
-  });
+  await writeBlobJson(DATA_PATH,{mosques:data.mosques.slice(0,MAX_MOSQUES),updatedAt:Date.now()});
+}
+async function loadFeedback(){
+  const j=await readBlobJson(FEEDBACK_PATH,{items:[],updatedAt:0});
+  return {items:Array.isArray(j.items)?j.items:[],updatedAt:Number(j.updatedAt)||0};
+}
+async function saveFeedback(data){
+  await writeBlobJson(FEEDBACK_PATH,{items:data.items.slice(0,MAX_FEEDBACK),updatedAt:Date.now()});
 }
 async function saveImage(mid,dataUrl){
   if(!dataUrl||typeof dataUrl!=='string')return '';
@@ -59,11 +72,9 @@ async function saveImage(mid,dataUrl){
   return out.url;
 }
 function adminOk(req,body){
+  const expected=String(process.env.MOSQUE_ADMIN_SECRET||'');
   const got=String(req.headers['x-admin-secret']||body?.secret||'');
-  const hash=crypto.createHash('sha256').update(got,'utf8').digest('hex');
-  const jamatHash='8835ca7f34c55967e6b1d6b00d70020e8a85910bd46b93a133d5af41792dd0c5';
-  const expected=process.env.MOSQUE_ADMIN_SECRET||'';
-  return hash===jamatHash || (!!expected && got===expected);
+  return !!expected&&got===expected;
 }
 
 export default async function handler(req,res){
@@ -79,10 +90,38 @@ export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({ok:false,error:'Method not allowed'});
   let body=req.body;if(typeof body==='string'){try{body=JSON.parse(body)}catch(e){body={}}}body=body||{};
 
+  if(body.action==='about_submit'){
+    const message=str(body.message,500);
+    if(!message)return res.status(400).json({ok:false,error:'Message required'});
+    if(adminOk(req,{secret:message}))return res.status(200).json({ok:true,admin:true});
+
+    const data=await loadFeedback();
+    data.items.unshift({
+      id:'fb_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),
+      message,
+      name:str(body.name,60),
+      createdAt:Date.now()
+    });
+    await saveFeedback(data);
+    return res.status(200).json({ok:true,feedback:true});
+  }
+
   if(body.action==='verify'){
     return adminOk(req,body)?res.status(200).json({ok:true}):res.status(401).json({ok:false,error:'Invalid admin word'});
   }
+
   if(!adminOk(req,body))return res.status(401).json({ok:false,error:'Unauthorized'});
+
+  if(body.action==='feedbacks'){
+    const data=await loadFeedback();
+    return res.status(200).json({ok:true,items:data.items.slice(0,300)});
+  }
+  if(body.action==='delete_feedback'){
+    const fid=id(body.id),data=await loadFeedback();
+    data.items=data.items.filter(x=>x&&x.id!==fid);
+    await saveFeedback(data);
+    return res.status(200).json({ok:true});
+  }
 
   const data=await loadData();
 
