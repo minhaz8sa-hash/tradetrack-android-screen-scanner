@@ -3,7 +3,9 @@ package com.mirex.namazorbit;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlarmManager;
+import android.app.NotificationManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.hardware.GeomagneticField;
@@ -153,6 +155,7 @@ public class MainActivity extends Activity implements SensorEventListener {
     protected void onResume() {
         super.onResume();
         stopAnyAlarmVibration();
+        try { PrayerSoundService.stop(this); } catch (Exception ignored) {}
         if (rotationSensor != null) sensorManager.registerListener(this, rotationSensor, SensorManager.SENSOR_DELAY_NORMAL);
         notifyLocationPermissionToWeb();
     }
@@ -454,6 +457,57 @@ public class MainActivity extends Activity implements SensorEventListener {
                     qazaDue,
                     currentPrayer == null ? "Between prayers" : currentPrayer
             );
+        }
+
+        @JavascriptInterface
+        public void updatePrayerWidgetV3(String nextPrayer, String startTime, long targetEpochMillis, double qiblaBearing, int qazaDue, String currentPrayer) {
+            PrayerWidgetProvider.storeAndUpdateV3(
+                    context,
+                    nextPrayer == null ? "Next prayer" : nextPrayer,
+                    startTime == null ? "—" : startTime,
+                    targetEpochMillis,
+                    qiblaBearing,
+                    qazaDue,
+                    currentPrayer == null ? "Between prayers" : currentPrayer
+            );
+        }
+
+        @JavascriptInterface
+        public void configureStrongAlarm(boolean enabled, int minimumVolumePercent) {
+            int pct = Math.max(10, Math.min(100, minimumVolumePercent));
+            context.getSharedPreferences("namaz_orbit_audio", Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean("strong_enabled", enabled)
+                    .putInt("min_volume_pct", pct)
+                    .apply();
+        }
+
+        @JavascriptInterface
+        public boolean isStrongAlarmEnabled() {
+            return context.getSharedPreferences("namaz_orbit_audio", Context.MODE_PRIVATE)
+                    .getBoolean("strong_enabled", true);
+        }
+
+        @JavascriptInterface
+        public int getStrongAlarmVolumePercent() {
+            return context.getSharedPreferences("namaz_orbit_audio", Context.MODE_PRIVATE)
+                    .getInt("min_volume_pct", 80);
+        }
+
+        @JavascriptInterface
+        public boolean hasDndAlarmAccess() {
+            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.M || (nm != null && nm.isNotificationPolicyAccessGranted());
+        }
+
+        @JavascriptInterface
+        public void openDndAlarmAccess() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return;
+            try {
+                Intent i = new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(i);
+            } catch (Exception ignored) {}
         }
 
         @JavascriptInterface
