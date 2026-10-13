@@ -1,5 +1,3 @@
-const ENDPOINT="https://base44.app/api/apps/6a1d6d69aab915d09b7b082d/functions/analyzeMobileScreenCapture";
-const APP_ID="6a1d6d69aab915d09b7b082d";
 const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
 
 async function captureActiveQuotex(senderTab, quality=75){
@@ -15,6 +13,8 @@ async function dataUrlToBlob(dataUrl){
 }
 
 async function postFrames({frames,mode,scanSessionId,assetHint,payoutHint}){
+  const {backendUrl,scannerToken}=await chrome.storage.local.get(["backendUrl","scannerToken"]);
+  if(!backendUrl||!scannerToken) throw new Error("Configure backend URL and scanner token in extension settings");
   const form=new FormData();
   form.append("capturedAt",new Date().toISOString());
   form.append("analysisMode",mode||"full");
@@ -29,11 +29,11 @@ async function postFrames({frames,mode,scanSessionId,assetHint,payoutHint}){
   }
 
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),28000);
+  const timer=setTimeout(()=>controller.abort(),17000);
   try{
-    const res=await fetch(ENDPOINT,{
+    const res=await fetch(backendUrl,{
       method:"POST",
-      headers:{"X-App-Id":APP_ID},
+      headers:{Authorization:"Bearer "+scannerToken},
       body:form,
       signal:controller.signal
     });
