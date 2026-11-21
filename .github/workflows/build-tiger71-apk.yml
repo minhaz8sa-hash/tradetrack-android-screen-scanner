@@ -27,9 +27,11 @@ jobs:
       - name: Verify Android SDK and install Android 35 if necessary
         run: |
           echo "ANDROID_HOME=${ANDROID_HOME}"
-          command -v sdkmanager
+          SDKMANAGER="$(find "${ANDROID_HOME}/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          echo "sdkmanager=${SDKMANAGER}"
+          test -n "${SDKMANAGER}"
           if [ ! -d "${ANDROID_HOME}/platforms/android-35" ]; then
-            sdkmanager "platforms;android-35" "build-tools;35.0.0"
+            "${SDKMANAGER}" "platforms;android-35" "build-tools;35.0.0"
           fi
       - name: Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
