@@ -1,6 +1,13 @@
 package com.tigers71.esports;
 
 import android.app.Activity;
+import android.Manifest;
+import android.os.Build;
+import android.content.pm.PackageManager;
+import android.graphics.Color;
+import android.graphics.Insets;
+import android.view.WindowInsets;
+import android.webkit.JavascriptInterface;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
@@ -27,7 +34,8 @@ import java.io.File;
 import java.io.IOException;
 
 public class MainActivity extends Activity {
-    private static final String HOME_URL = "https://tiger-squad-pro.base44.app";
+    private static final String HOME_URL = "https://tiger-71.com";
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 4302;
     private static final int FILE_CHOOSER_REQUEST = 4101;
 
     private WebView webView;
@@ -40,7 +48,21 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(8, 9, 14));
+        // Android 15+ enforces edge-to-edge for targetSdk 35. Give the WebView
+        // its own safe rectangular area, outside status/navigation/cutout bars.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            root.setOnApplyWindowInsetsListener((view, insets) -> {
+                Insets safe = insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
+                return WindowInsets.CONSUMED;
+            });
+        }
         webView = new WebView(this);
+        webView.setBackgroundColor(Color.rgb(8, 9, 14));
         progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
 
         root.addView(webView, new FrameLayout.LayoutParams(
@@ -60,13 +82,18 @@ public class MainActivity extends Activity {
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
-            webView.loadUrl(HOME_URL);
+            Uri deepLink = getIntent() == null ? null : getIntent().getData();
+            webView.loadUrl(isTrustedUrl(deepLink) ? deepLink.toString() : HOME_URL);
         }
     }
 
     private void configureWebView() {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        // Native notification permission and scheduled Guild War reminders.
+        // No privileged user data or API key is exposed through this bridge.
+        webView.addJavascriptInterface(new T71NativeBridge(), "T71Android");
+        T71Notifications.ensureChannel(this);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
@@ -212,6 +239,84 @@ public class MainActivity extends Activity {
         filePathCallback.onReceiveValue(result);
         filePathCallback = null;
         cameraUri = null;
+    }
+
+    private boolean isTrustedUrl(Uri uri) {
+        if (uri == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
+        String host = uri.getHost();
+        return "tiger-71.com".equalsIgnoreCase(host) || "www.tiger-71.com".equalsIgnoreCase(host);
+    }
+
+    private boolean isTrustedPage() {
+        try { return isTrustedUrl(Uri.parse(webView.getUrl())); }
+        catch (Exception ignored) { return false; }
+    }
+
+    private boolean notificationsGranted() {
+        return Build.VERSION.SDK_INT < 33 ||
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void refreshNotificationUi() {
+        if (webView == null) return;
+        webView.evaluateJavascript("window.dispatchEvent(new Event('t71-native-notification-change'))", null);
+    }
+
+    private final class T71NativeBridge {
+        @JavascriptInterface public String getStatus() {
+            if (!isTrustedPage()) return "unsupported";
+            if (!getSharedPreferences("t71", MODE_PRIVATE).getBoolean("guild_notifications_enabled", false)) return "prompt";
+            return notificationsGranted() ? "enabled" : "denied";
+        }
+
+        @JavascriptInterface public void enableNotifications() {
+            runOnUiThread(() -> {
+                if (!isTrustedPage()) return;
+                if (notificationsGranted()) {
+                    T71Notifications.enable(MainActivity.this);
+                    refreshNotificationUi();
+                } else if (Build.VERSION.SDK_INT >= 33) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATION_PERMISSION_REQUEST);
+                }
+            });
+        }
+
+        @JavascriptInterface public void testNotification() {
+            runOnUiThread(() -> {
+                if (!isTrustedPage() || !notificationsGranted()) return;
+                T71Notifications.showLocal(MainActivity.this, "test");
+            });
+        }
+
+        @JavascriptInterface public void showActivityNotification(String kind) {
+            // Only predefined event kinds are accepted; no arbitrary text or URLs.
+            if (!"chat".equals(kind) && !"glory".equals(kind)) return;
+            runOnUiThread(() -> {
+                if (!isTrustedPage() || !notificationsGranted()) return;
+                if (getSharedPreferences("t71", MODE_PRIVATE).getBoolean("guild_notifications_enabled", false)) {
+                    T71Notifications.showLocal(MainActivity.this, kind);
+                }
+            });
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                T71Notifications.enable(this);
+            }
+            refreshNotificationUi();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        Uri link = intent == null ? null : intent.getData();
+        if (webView != null && isTrustedUrl(link)) webView.loadUrl(link.toString());
     }
 
     @Override
